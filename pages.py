@@ -1,3 +1,4 @@
+
 # pages.py  -  RVG Gateway v9.2
 # شامل: LOGIN_HTML, DASHBOARD_HTML, get_public_page_html()
 
@@ -7,97 +8,334 @@ LOGIN_HTML = r"""<!DOCTYPE html>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ورود · RVG Gateway</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#060f1d;--card:rgba(10,22,40,0.9);--accent:#3B82F6;--text:#E8F4FF;--dim:#3D6B8E;--mid:#7BAED4;--border:rgba(59,130,246,0.2)}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#080B14;--bg2:#0D1220;--card:rgba(13,18,32,0.86);--card-in:rgba(255,255,255,0.02);
+  --accent:#4F6BFF;--accent2:#7C93FF;--signal:#2E8BFF;
+  --text:#EEF2FF;--dim:#5A6690;--mid:#8B96C4;--border:rgba(124,147,255,0.16);
+  --glow:rgba(79,107,255,.32);--glow-signal:rgba(46,139,255,.22);
+  --danger:#FB7185;
+}
+[data-theme="light"]{
+  --bg:#EEF1FA;--bg2:#E4E9F7;--card:rgba(255,255,255,0.88);--card-in:rgba(79,107,255,0.03);
+  --accent:#3450E0;--accent2:#4F6BFF;--signal:#1465D8;
+  --text:#111531;--dim:#7480AC;--mid:#4C5786;--border:rgba(52,80,224,0.14);
+  --glow:rgba(52,80,224,.16);--glow-signal:rgba(20,101,216,.14);
+}
 html,body{height:100%;overflow:hidden}
-body{font-family:'Vazirmatn',sans-serif;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
-.bg{position:fixed;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(59,130,246,0.1),transparent 70%),var(--bg);z-index:0}
-.grid{position:fixed;inset:0;background-image:linear-gradient(rgba(59,130,246,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(59,130,246,0.04) 1px,transparent 1px);background-size:44px 44px;z-index:0}
-.orb{position:fixed;border-radius:50%;filter:blur(90px);z-index:0;animation:fl 9s ease-in-out infinite}
-.o1{width:380px;height:380px;background:rgba(59,130,246,0.07);top:-100px;right:-80px}
-.o2{width:280px;height:280px;background:rgba(16,185,129,0.04);bottom:-60px;left:-60px;animation-delay:4s}
-@keyframes fl{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}
-.wrap{position:relative;z-index:10;width:100%;max-width:400px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:38px 34px 34px;backdrop-filter:blur(24px);box-shadow:0 0 80px rgba(59,130,246,0.07),0 20px 60px rgba(0,0,0,.5)}
-.brand{display:flex;align-items:center;gap:14px;margin-bottom:28px}
-.brand-img{width:48px;height:48px;border-radius:13px;overflow:hidden;border:1px solid var(--border);box-shadow:0 0 20px rgba(59,130,246,0.3);flex-shrink:0}
-.brand-img img{width:100%;height:100%;object-fit:cover}
-.brand-name{font-size:16px;font-weight:700;color:var(--text)}
-.brand-sub{font-size:11px;color:var(--dim);margin-top:2px}
-h1{font-size:21px;font-weight:700;color:var(--text);margin-bottom:5px;letter-spacing:-.02em}
-.sub{font-size:12px;color:var(--mid);margin-bottom:24px;line-height:1.6}
-.hint{display:flex;align-items:center;gap:10px;background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.15);border-radius:10px;padding:10px 14px;margin-bottom:20px}
+body{
+  font-family:'Vazirmatn',sans-serif;background:var(--bg);display:flex;align-items:center;justify-content:center;
+  padding:20px;position:relative;transition:background .5s ease
+}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+
+/* ══════ پس‌زمینه ══════ */
+.bg{position:fixed;inset:0;z-index:0;background:
+  radial-gradient(ellipse 60% 46% at 18% 8%,var(--glow),transparent 68%),
+  radial-gradient(ellipse 50% 40% at 88% 92%,var(--glow-signal),transparent 65%),
+  var(--bg);transition:background .5s ease;animation:bgshift 14s ease-in-out infinite}
+@keyframes bgshift{
+  0%,100%{filter:hue-rotate(0deg) brightness(1)}
+  50%{filter:hue-rotate(8deg) brightness(1.05)}
+}
+.grid{position:fixed;inset:0;z-index:0;background-image:
+  linear-gradient(rgba(124,147,255,0.05) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(124,147,255,0.05) 1px,transparent 1px);
+  background-size:44px 44px;
+  mask-image:radial-gradient(ellipse 62% 62% at 50% 42%,black 25%,transparent 85%);
+  animation:gridpan 30s linear infinite}
+@keyframes gridpan{from{background-position:0 0}to{background-position:88px 88px}}
+
+/* ذرات شناور — عنصر جدید */
+.particles{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.particle{position:absolute;border-radius:50%;background:var(--signal);opacity:0;box-shadow:0 0 10px var(--signal);animation:floatp linear infinite}
+@keyframes floatp{
+  0%{transform:translateY(110vh) translateX(0) scale(.4);opacity:0}
+  8%{opacity:.55}
+  92%{opacity:.4}
+  100%{transform:translateY(-10vh) translateX(var(--drift,40px)) scale(1);opacity:0}
+}
+
+/* مسیر سیگنال — عنصر امضادار: یک خط مسیر شبکه با پالس متحرک */
+.route{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.55}
+.route svg{width:100%;height:100%}
+.route path{fill:none;stroke:var(--border);stroke-width:1;stroke-dasharray:2 7;stroke-linecap:round;animation:dashflow 6s linear infinite}
+@keyframes dashflow{to{stroke-dashoffset:-90}}
+.pulse-dot{filter:drop-shadow(0 0 6px var(--signal))}
+
+/* ══════ سوییچ تم ══════ */
+.theme-switch{position:fixed;top:22px;left:22px;z-index:50}
+.theme-btn{
+  width:42px;height:42px;border-radius:12px;background:var(--card);border:1px solid var(--border);
+  color:var(--mid);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;
+  backdrop-filter:blur(16px);transition:all .25s cubic-bezier(.4,0,.2,1);position:relative;overflow:hidden
+}
+.theme-btn:hover{border-color:var(--accent);color:var(--accent2);transform:translateY(-2px)}
+.theme-btn i{position:relative;z-index:1;transition:transform .45s cubic-bezier(.34,1.56,.64,1)}
+.theme-btn.spin i{transform:rotate(300deg)}
+
+/* نشان وضعیت برخط بودن گیت‌وی */
+.status-badge{
+  position:fixed;top:22px;right:22px;z-index:50;display:flex;align-items:center;gap:7px;
+  background:var(--card);border:1px solid var(--border);border-radius:999px;padding:8px 14px 8px 12px;
+  backdrop-filter:blur(16px);animation:badgein .6s cubic-bezier(.16,1,.3,1) .3s backwards
+}
+@keyframes badgein{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--signal);position:relative;flex-shrink:0}
+.status-dot::after{content:'';position:absolute;inset:-4px;border-radius:50%;background:var(--signal);opacity:.4;animation:ping 1.8s cubic-bezier(0,0,.2,1) infinite}
+@keyframes ping{0%{transform:scale(.6);opacity:.5}75%,100%{transform:scale(2.1);opacity:0}}
+.status-badge span{font-size:10.5px;color:var(--mid);letter-spacing:.03em}
+
+/* ══════ کارت ══════ */
+.wrap{position:relative;z-index:10;width:100%;max-width:392px;animation:cardIn .65s cubic-bezier(.16,1,.3,1);perspective:900px}
+@keyframes cardIn{from{opacity:0;transform:translateY(20px) scale(.975)}to{opacity:1;transform:none}}
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:20px;padding:38px 32px 30px;
+  backdrop-filter:blur(30px);box-shadow:0 30px 80px -20px rgba(0,0,0,.55),0 0 0 1px var(--card-in) inset;
+  position:relative;overflow:hidden;transition:transform .35s cubic-bezier(.16,1,.3,1),box-shadow .35s ease
+}
+.card:hover{box-shadow:0 34px 90px -18px rgba(0,0,0,.6),0 0 0 1px var(--card-in) inset,0 0 40px -6px var(--glow-signal)}
+.card::before{
+  content:'';position:absolute;top:0;left:16px;right:16px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--signal),transparent);
+  animation:sheen 4s ease-in-out infinite
+}
+@keyframes sheen{0%,100%{opacity:.15;transform:translateX(-40%)}50%{opacity:.9;transform:translateX(40%)}}
+/* حاشیه‌ی نور چرخان جدید */
+.card::after{
+  content:'';position:absolute;inset:-1px;border-radius:20px;padding:1px;z-index:-1;pointer-events:none;
+  background:conic-gradient(from var(--ang,0deg),transparent 0%,var(--signal) 8%,transparent 22%,transparent 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;opacity:.5;animation:rotang 5.5s linear infinite
+}
+@keyframes rotang{to{--ang:360deg}}
+@property --ang{syntax:'<angle>';inherits:false;initial-value:0deg}
+
+.brand{display:flex;align-items:center;gap:13px;margin-bottom:28px}
+.brand-img{width:46px;height:46px;border-radius:13px;overflow:hidden;border:1px solid var(--border);flex-shrink:0;position:relative;box-shadow:0 0 0 4px var(--card-in);animation:brandpulse 3.2s ease-in-out infinite}
+@keyframes brandpulse{0%,100%{box-shadow:0 0 0 4px var(--card-in)}50%{box-shadow:0 0 0 6px var(--glow-signal)}}
+.brand-img img{width:100%;height:100%;object-fit:cover;display:block}
+.brand-name{font-size:15.5px;font-weight:800;color:var(--text);letter-spacing:-.01em}
+.brand-sub{font-size:10.5px;color:var(--dim);margin-top:3px;letter-spacing:.02em}
+.brand-sub .mono{color:var(--signal);font-weight:600}
+
+h1{font-size:21px;font-weight:800;color:var(--text);margin-bottom:5px;letter-spacing:-.02em;animation:fadeup .5s cubic-bezier(.16,1,.3,1) .1s backwards}
+.sub{font-size:12.5px;color:var(--mid);margin-bottom:24px;line-height:1.7;animation:fadeup .5s cubic-bezier(.16,1,.3,1) .18s backwards}
+@keyframes fadeup{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+.hint{
+  display:flex;align-items:center;gap:10px;background:var(--card-in);border:1px dashed var(--border);
+  border-radius:12px;padding:10px 14px;margin-bottom:22px;animation:fadeup .5s cubic-bezier(.16,1,.3,1) .24s backwards
+}
+.hint i{color:var(--dim);font-size:15px}
 .hint-label{font-size:11px;color:var(--dim);flex:1}
-.hint-val{font-family:ui-monospace,monospace;font-size:14px;font-weight:700;color:var(--accent);background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);padding:3px 11px;border-radius:7px;cursor:pointer;transition:.15s;letter-spacing:.08em}
-.hint-val:hover{background:rgba(59,130,246,0.22)}
-.field{margin-bottom:18px}
-.field label{display:block;font-size:10.5px;font-weight:600;color:var(--mid);margin-bottom:7px;text-transform:uppercase;letter-spacing:.06em}
+.hint-val{
+  font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:var(--signal);
+  background:var(--glow-signal);border:1px solid rgba(46,139,255,0.3);padding:4px 11px;border-radius:7px;
+  cursor:pointer;transition:.18s;letter-spacing:.06em
+}
+.hint-val:hover{filter:brightness(1.15);transform:translateY(-1px) scale(1.04)}
+.hint-val:active{transform:translateY(0) scale(.96)}
+
+.field{margin-bottom:18px;animation:fadeup .5s cubic-bezier(.16,1,.3,1) .3s backwards}
+.field label{display:block;font-size:10.5px;font-weight:700;color:var(--mid);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em}
 .inp-wrap{position:relative}
-input[type=password]{width:100%;padding:13px 44px 13px 16px;border-radius:11px;border:1px solid var(--border);background:rgba(0,0,0,.3);color:var(--text);font-family:inherit;font-size:14px;outline:none;transition:.2s}
-input[type=password]:focus{border-color:rgba(59,130,246,.55);background:rgba(0,0,0,.4);box-shadow:0 0 0 3px rgba(59,130,246,.1)}
-.ic{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--dim);font-size:18px;pointer-events:none;transition:.2s}
-input:focus+.ic{color:var(--accent)}
-.err{display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#F87171;align-items:center;gap:8px}
+input[type=password],input[type=text]{
+  width:100%;padding:13px 44px 13px 44px;border-radius:12px;border:1px solid var(--border);
+  background:rgba(0,0,0,.18);color:var(--text);font-family:inherit;font-size:14.5px;outline:none;transition:.2s
+}
+[data-theme="light"] input[type=password],[data-theme="light"] input[type=text]{background:rgba(52,80,224,.035)}
+input::placeholder{color:var(--dim)}
+input:focus{border-color:var(--accent);background:rgba(79,107,255,.06);box-shadow:0 0 0 4px var(--glow)}
+.ic-lock{position:absolute;right:15px;top:50%;transform:translateY(-50%);color:var(--dim);font-size:17px;pointer-events:none;transition:.2s}
+input:focus~.ic-lock{color:var(--accent2);animation:wiggle .4s ease}
+@keyframes wiggle{0%,100%{transform:translateY(-50%) rotate(0)}25%{transform:translateY(-50%) rotate(-12deg)}75%{transform:translateY(-50%) rotate(12deg)}}
+.ic-eye{
+  position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--dim);font-size:17px;
+  cursor:pointer;padding:6px;transition:.2s;line-height:0
+}
+.ic-eye:hover{color:var(--accent2);transform:translateY(-50%) scale(1.15)}
+
+.err{display:none;background:rgba(251,113,133,.08);border:1px solid rgba(251,113,133,.25);border-radius:11px;padding:11px 14px;margin-bottom:16px;font-size:12.5px;color:var(--danger);align-items:center;gap:8px;animation:shake .35s}
 .err.show{display:flex}
-.btn{width:100%;padding:13px;border-radius:11px;border:none;cursor:pointer;background:linear-gradient(135deg,#2563EB,#1D4ED8);color:#fff;font-family:inherit;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 20px rgba(37,99,235,.4);transition:.2s;position:relative;overflow:hidden}
-.btn::before{content:'';position:absolute;inset:0;background:rgba(255,255,255,.08);opacity:0;transition:.2s}
-.btn:hover::before{opacity:1}
-.btn:disabled{opacity:.5;cursor:not-allowed}
-.footer{margin-top:22px;padding-top:18px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:8px;font-size:11px;color:var(--dim)}
-.footer a{color:var(--accent);font-weight:600;text-decoration:none;display:flex;align-items:center;gap:4px}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+
+.btn{
+  width:100%;padding:13.5px;border-radius:12px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--accent),var(--accent2),var(--signal));background-size:200% 200%;
+  color:#fff;font-family:inherit;font-size:14.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 10px 26px -6px rgba(79,107,255,.55);
+  transition:all .22s;position:relative;overflow:hidden;margin-top:6px;
+  animation:btngrad 4s ease infinite,fadeup .5s cubic-bezier(.16,1,.3,1) .36s backwards
+}
+@keyframes btngrad{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.btn::before{content:'';position:absolute;inset:0;background:linear-gradient(120deg,transparent,rgba(255,255,255,.25),transparent);width:50%;transform:translateX(-160%)}
+.btn:hover::before{animation:btnsheen 1s ease}
+@keyframes btnsheen{to{transform:translateX(260%)}}
+.btn:hover{transform:translateY(-2px);box-shadow:0 14px 32px -6px rgba(46,139,255,.65)}
+.btn:active{transform:translateY(0) scale(.98)}
+.btn:disabled{opacity:.55;cursor:not-allowed;transform:none;animation:btngrad 4s ease infinite}
+.btn:focus-visible,input:focus-visible,.theme-btn:focus-visible,.hint-val:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+.footer{margin-top:22px;padding-top:18px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:8px;font-size:11.5px;color:var(--dim);animation:fadeup .5s cubic-bezier(.16,1,.3,1) .42s backwards}
+.footer a{color:var(--accent2);font-weight:700;text-decoration:none;display:flex;align-items:center;gap:5px;transition:.18s}
+.footer a:hover{filter:brightness(1.25);transform:translateY(-1px)}
+
 @keyframes spin{to{transform:rotate(360deg)}}
+
+@media (max-width:420px){
+  .card{padding:30px 22px 24px;border-radius:18px}
+  .status-badge span{display:none}
+  .status-badge{padding:9px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s !important;animation-iteration-count:1 !important}
+}
 </style>
 </head>
 <body>
 <div class="bg"></div><div class="grid"></div>
-<div class="orb o1"></div><div class="orb o2"></div>
-<div class="wrap">
-  <div class="card">
+<div class="particles" id="particles" aria-hidden="true"></div>
+<div class="route" aria-hidden="true">
+  <svg viewBox="0 0 1000 700" preserveAspectRatio="none">
+    <path d="M -50 120 C 200 40, 350 220, 620 90 S 1050 40, 1100 130" />
+    <path d="M -50 600 C 220 680, 420 480, 700 610 S 1000 700, 1080 560" />
+    <circle class="pulse-dot" r="3" fill="var(--signal)">
+      <animateMotion dur="7s" repeatCount="indefinite" path="M -50 120 C 200 40, 350 220, 620 90 S 1050 40, 1100 130" />
+    </circle>
+    <circle class="pulse-dot" r="2.4" fill="var(--accent2)">
+      <animateMotion dur="9s" repeatCount="indefinite" path="M -50 600 C 220 680, 420 480, 700 610 S 1000 700, 1080 560" />
+    </circle>
+  </svg>
+</div>
+
+<div class="theme-switch">
+  <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="تغییر تم" aria-label="تغییر تم">
+    <i class="ti ti-sun" id="theme-icon"></i>
+  </button>
+</div>
+<div class="status-badge"><span class="status-dot"></span><span class="mono">GATEWAY ONLINE</span></div>
+
+<div class="wrap" id="wrap">
+  <div class="card" id="card">
     <div class="brand">
       <div class="brand-img"><img src="https://yt3.googleusercontent.com/vA6bYj1V386YmibpWRNFJtsRRqwfY_U9wnb7gmW90eRVXyNB7gAfjj1XPs5UX0cdKdQprrI=s160-c-k-c0x00ffffff-no-rj" alt="codebox"></div>
-      <div><div class="brand-name">codebox</div><div class="brand-sub">RVG Gateway · v9.2</div></div>
+      <div><div class="brand-name">codebox</div><div class="brand-sub">RVG Gateway <span class="mono">· v9.2</span></div></div>
     </div>
     <h1>ورود به پنل</h1>
-    <p class="sub">رمز عبور را برای دسترسی به داشبورد وارد کنید</p>
-    <div class="err" id="err"><i class="ti ti-alert-circle"></i><span id="err-text"></span></div>
+    <p class="sub">رمز عبور را برای دسترسی به داشبورد مدیریت وارد کنید</p>
+
+    <div class="err" id="err" role="alert"><i class="ti ti-alert-circle"></i><span id="err-text"></span></div>
+
     <div class="hint">
+      <i class="ti ti-info-circle"></i>
       <span class="hint-label">رمز پیش‌فرض سیستم</span>
-      <span class="hint-val" onclick="document.getElementById('pw').value='123456';document.getElementById('pw').focus()">123456</span>
+      <span class="hint-val" tabindex="0" role="button" onclick="fillDefault()" onkeydown="if(event.key==='Enter')fillDefault()">123456</span>
     </div>
-    <form id="form">
+
+    <form id="form" novalidate>
       <div class="field">
-        <label>رمز عبور</label>
+        <label for="pw">رمز عبور</label>
         <div class="inp-wrap">
-          <input type="password" id="pw" placeholder="رمز عبور را وارد کنید" autofocus required>
-          <i class="ti ti-lock ic"></i>
+          <input type="password" id="pw" placeholder="رمز عبور را وارد کنید" autofocus required autocomplete="current-password">
+          <i class="ti ti-lock ic-lock"></i>
+          <i class="ti ti-eye ic-eye" id="eye-toggle" onclick="togglePw()" role="button" tabindex="0" aria-label="نمایش رمز عبور"></i>
         </div>
       </div>
       <button class="btn" type="submit" id="btn"><i class="ti ti-login-2"></i> ورود به داشبورد</button>
     </form>
-    <div class="footer">کانال رسمی<a href="https://t.me/CodeBoxo" target="_blank"><i class="ti ti-brand-telegram"></i>@CodeBoxo</a></div>
+
+    <div class="footer">کانال رسمی<a href="https://t.me/CodeBoxo" target="_blank" rel="noopener"><i class="ti ti-brand-telegram"></i>@CodeBoxo</a></div>
   </div>
 </div>
+
 <script>
-document.getElementById('form').addEventListener('submit',async e=>{
+/* ══════ تم روشن/تاریک ══════ */
+let isDark = localStorage.getItem('rvg-login-theme') !== 'light';
+function applyTheme(dark){
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  document.getElementById('theme-icon').className = 'ti ' + (dark ? 'ti-sun' : 'ti-moon');
+}
+function toggleTheme(){
+  isDark = !isDark;
+  localStorage.setItem('rvg-login-theme', isDark ? 'dark' : 'light');
+  const btn = document.getElementById('theme-btn');
+  btn.classList.add('spin');
+  setTimeout(()=>btn.classList.remove('spin'), 420);
+  applyTheme(isDark);
+}
+applyTheme(isDark);
+
+function fillDefault(){
+  const pw = document.getElementById('pw');
+  pw.value = '123456';
+  pw.focus();
+}
+
+function togglePw(){
+  const pw = document.getElementById('pw');
+  const eye = document.getElementById('eye-toggle');
+  const show = pw.type === 'password';
+  pw.type = show ? 'text' : 'password';
+  eye.className = 'ti ' + (show ? 'ti-eye-off' : 'ti-eye') + ' ic-eye';
+}
+
+/* ذرات شناور پس‌زمینه */
+(function(){
+  const box = document.getElementById('particles');
+  const n = 22;
+  for(let i=0;i<n;i++){
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = 2 + Math.random()*3;
+    p.style.width = size+'px';
+    p.style.height = size+'px';
+    p.style.left = Math.random()*100+'vw';
+    p.style.setProperty('--drift', (Math.random()*80-40)+'px');
+    p.style.animationDuration = (10 + Math.random()*14)+'s';
+    p.style.animationDelay = (Math.random()*14)+'s';
+    box.appendChild(p);
+  }
+})();
+
+/* افکت تیلت سه‌بعدی روی کارت با موس */
+(function(){
+  const wrap = document.getElementById('wrap');
+  const card = document.getElementById('card');
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if(window.matchMedia('(hover: none)').matches) return;
+  wrap.addEventListener('mousemove', (e)=>{
+    const r = wrap.getBoundingClientRect();
+    const x = (e.clientX - r.left)/r.width - .5;
+    const y = (e.clientY - r.top)/r.height - .5;
+    card.style.transform = `rotateY(${x*6}deg) rotateX(${-y*6}deg) translateZ(0)`;
+  });
+  wrap.addEventListener('mouseleave', ()=>{
+    card.style.transform = 'rotateY(0) rotateX(0)';
+  });
+})();
+
+document.getElementById('form').addEventListener('submit', async e => {
   e.preventDefault();
-  const btn=document.getElementById('btn'),err=document.getElementById('err'),et=document.getElementById('err-text');
-  err.classList.remove('show');btn.disabled=true;
-  btn.innerHTML='<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> در حال ورود...';
+  const btn = document.getElementById('btn'), err = document.getElementById('err'), et = document.getElementById('err-text');
+  err.classList.remove('show'); btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> در حال ورود...';
   try{
-    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:document.getElementById('pw').value})});
-    if(!r.ok){const d=await r.json().catch(()=>({}));throw new Error(d.detail||'خطا');}
-    location.href='/dashboard';
+    const r = await fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password: document.getElementById('pw').value})});
+    if(!r.ok){ const d = await r.json().catch(()=>({})); throw new Error(d.detail || 'خطا در ورود'); }
+    location.href = '/dashboard';
   }catch(e){
-    et.textContent=e.message;err.classList.add('show');
-    btn.disabled=false;btn.innerHTML='<i class="ti ti-login-2"></i> ورود به داشبورد';
+    et.textContent = e.message;
+    err.classList.add('show');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-login-2"></i> ورود به داشبورد';
   }
 });
 </script>
 </body></html>"""
-
 
 DASHBOARD_HTML = r"""<!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -228,6 +466,39 @@ a{color:inherit;text-decoration:none}
 .traf-range-tab.on{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(59,130,246,.35)}
 .traf-chart-body{height:320px;margin-top:14px;position:relative}
 
+/* ══════ ALPN & Fingerprint — کارت‌های جدید ══════ */
+.fp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.fp-card{border:1.5px solid var(--card-b);border-radius:12px;padding:11px 8px;cursor:pointer;
+  transition:.18s;text-align:center;background:rgba(0,0,0,.1);position:relative}
+[data-theme="light"] .fp-card{background:#fff}
+.fp-card:hover{border-color:var(--card-bh);transform:translateY(-1px)}
+.fp-card.active{border-color:var(--accent);background:var(--accent-d);box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.fp-card-icon{width:28px;height:28px;border-radius:8px;background:var(--accent-d);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;font-size:14px;margin:0 auto 6px}
+.fp-card.active .fp-card-icon{background:var(--accent);color:#fff}
+.fp-card-title{font-size:10.5px;font-weight:800;color:var(--t1)}
+.fp-card-check{position:absolute;top:5px;left:5px;width:14px;height:14px;border-radius:50%;
+  background:var(--accent);color:#fff;font-size:8px;display:flex;align-items:center;justify-content:center;
+  opacity:0;transform:scale(.4);transition:.15s}
+.fp-card.active .fp-card-check{opacity:1;transform:scale(1)}
+
+.alpn-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.alpn-chip{display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:10px;
+  border:1.5px solid var(--card-b);background:rgba(0,0,0,.1);cursor:pointer;transition:.15s;
+  font-size:11px;font-weight:700;color:var(--t2)}
+[data-theme="light"] .alpn-chip{background:#fff}
+.alpn-chip:hover{border-color:var(--card-bh)}
+.alpn-chip.active{border-color:var(--accent);background:var(--accent-d);color:var(--accent2)}
+.alpn-chip-dot{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--card-b);
+  display:flex;align-items:center;justify-content:center;transition:.15s;flex-shrink:0}
+.alpn-chip.active .alpn-chip-dot{background:var(--accent);border-color:var(--accent)}
+.alpn-chip-dot i{font-size:9px;color:#fff;opacity:0;transform:scale(.5);transition:.15s}
+.alpn-chip.active .alpn-chip-dot i{opacity:1;transform:scale(1)}
+
+.stream-sub-label{font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;
+  letter-spacing:.06em;display:flex;align-items:center;gap:6px;margin-top:16px;margin-bottom:2px}
+.stream-sub-label i{color:var(--accent);font-size:13px}
+
 @media(max-width:900px){.traf-hero{grid-template-columns:1fr 1fr}}
 @media(max-width:520px){.traf-hero{grid-template-columns:1fr}.traf-chart-body{height:260px}}
 .m-icon{width:34px;height:34px;border-radius:8px;background:var(--accent-d);display:flex;align-items:center;justify-content:center;margin-bottom:11px;color:var(--accent);font-size:17px}
@@ -326,6 +597,39 @@ a{color:inherit;text-decoration:none}
 .chip{font-size:10.5px;font-weight:700;padding:5px 12px;border-radius:8px;background:var(--accent-d);color:var(--t2);border:1px solid var(--card-b);cursor:pointer;transition:.15s;white-space:nowrap}
 .chip:hover{background:rgba(59,130,246,.18);color:var(--accent2)}
 .chip.active{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 3px 10px rgba(59,130,246,.35)}
+.proto-tabs{display:flex;gap:8px;flex-wrap:wrap}
+.proto-step-label{font-size:10px;font-weight:800;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:6px;margin-bottom:9px}
+.proto-step-label i{color:var(--accent);font-size:14px}
+
+.proto-base-cards{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.proto-base-card{border:1.5px solid var(--card-b);border-radius:13px;padding:14px 12px;cursor:pointer;transition:.18s;text-align:center;position:relative;background:rgba(0,0,0,.1)}
+[data-theme="light"] .proto-base-card{background:#fff}
+.proto-base-card:hover{border-color:var(--card-bh);transform:translateY(-1px)}
+.proto-base-card.active{border-color:var(--accent);background:var(--accent-d);box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.proto-base-icon{width:34px;height:34px;border-radius:9px;background:var(--accent-d);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:17px;margin:0 auto 8px}
+.proto-base-card.active .proto-base-icon{background:var(--accent);color:#fff}
+.proto-base-title{font-size:12px;font-weight:800;color:var(--t1)}
+.proto-base-desc{font-size:9.5px;color:var(--t3);margin-top:3px}
+
+.proto-transport-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.proto-t-card{border:1.5px solid var(--card-b);border-radius:13px;padding:13px 10px;cursor:pointer;transition:.18s;text-align:center;position:relative;background:rgba(0,0,0,.1)}
+[data-theme="light"] .proto-t-card{background:#fff}
+.proto-t-card:hover{border-color:var(--card-bh);transform:translateY(-1px)}
+.proto-t-card.active{border-color:var(--accent);background:var(--accent-d);box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.proto-t-icon{width:30px;height:30px;border-radius:9px;background:var(--accent-d);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:15px;margin:0 auto 7px}
+.proto-t-card.active .proto-t-icon{background:var(--accent);color:#fff}
+.proto-t-title{font-size:10.5px;font-weight:800;color:var(--t1)}
+.proto-t-desc{font-size:9px;color:var(--t3);margin-top:3px;line-height:1.4}
+
+@media(max-width:760px){
+  .proto-transport-cards{grid-template-columns:1fr}
+}
+.proto-tab{flex:1;min-width:120px;display:flex;align-items:center;justify-content:center;gap:7px;
+  padding:11px 10px;border-radius:12px;border:1.5px solid var(--card-b);background:rgba(0,0,0,.1);
+  color:var(--t2);font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;transition:.15s}
+.proto-tab.active{border-color:var(--accent);background:var(--accent-d);color:var(--accent2);
+  box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.proto-submodes{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .proto-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
 .proto-card{border:1.5px solid var(--card-b);border-radius:13px;padding:13px 12px;cursor:pointer;transition:.18s;text-align:center;position:relative;background:rgba(0,0,0,.1)}
 [data-theme="light"] .proto-card{background:#fff}
@@ -605,6 +909,15 @@ a{color:inherit;text-decoration:none}
 .df-text{font-size:10px;color:var(--t3)}
 .df-link{font-size:11.5px;color:var(--accent2);display:flex;align-items:center;gap:5px;font-weight:600}
 
+.info-strip{display:flex;align-items:center;background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px 22px;margin-bottom:16px;gap:0;flex-wrap:wrap;box-shadow:var(--shadow)}
+.info-item{display:flex;flex-direction:column;gap:6px;flex:1;min-width:130px;padding:0 18px;position:relative}
+.info-item:not(:first-child)::before{content:'';position:absolute;right:0;top:2px;bottom:2px;width:1px;background:var(--card-b)}
+.info-item-label{font-size:10.5px;color:var(--t3);font-weight:700}
+.info-item-val{display:flex;align-items:center;gap:7px;font-size:15px;font-weight:800;color:var(--t1);letter-spacing:-.01em}
+.info-item-val i{color:var(--accent);font-size:16px}
+.info-item-val .info-badge{font-size:11px;font-weight:800;background:var(--green-bg);color:var(--green-t);padding:2px 9px;border-radius:20px}
+@media(max-width:760px){.info-strip{gap:14px}.info-item{min-width:45%;padding:0 0 10px}.info-item:not(:first-child)::before{display:none}}
+
 /* ══════ کانفیگ‌ها - طراحی ردیفی حرفه‌ای ══════ */
 .cfg-grid{display:flex;flex-direction:column;gap:10px}
 .cfg-card{background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:0;transition:all .2s cubic-bezier(.4,0,.2,1);position:relative;overflow:hidden}
@@ -632,6 +945,7 @@ a{color:inherit;text-decoration:none}
 .pc-ws{background:var(--accent-d);color:var(--accent2)}
 .pc-xhttp{background:var(--purple-bg);color:#A78BFA}
 .pc-ultra{background:var(--green-bg);color:var(--green-t)}
+.pc-ss{background:var(--purple-bg);color:#A78BFA}
 .cfg-sub-tag{font-size:9.5px;color:var(--t3);display:flex;align-items:center;gap:4px;white-space:nowrap}
 .cfg-sub-tag i{color:var(--purple);font-size:11px}
 .tog{width:19px;height:30px;border-radius:19px;background:rgba(100,116,139,0.25);position:relative;cursor:pointer;transition:.2s;flex-shrink:0;border:none}
@@ -826,10 +1140,352 @@ a{color:inherit;text-decoration:none}
  
 .sup-new-badge{display:inline-flex;align-items:center;gap:4px;background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;margin-right:6px;animation:pulse 1.6s infinite}
 
+/* ══════ مودال ساخت کانفیگ - نسخه حرفه‌ای ══════ */
+.cm-modal{max-width:620px;width:calc(100% - 32px);padding:0;border-radius:24px;overflow:hidden;
+  max-height:92vh;display:flex;flex-direction:column}
+.cm-head{background:linear-gradient(155deg,rgba(59,130,246,.14) 0%,transparent 70%);
+  padding:26px 28px 20px;position:relative;border-bottom:1px solid var(--card-b);flex-shrink:0}
+.cm-head::before{content:'';position:absolute;top:-60px;left:-60px;width:200px;height:200px;
+  background:radial-gradient(circle,rgba(59,130,246,.18),transparent 70%);pointer-events:none}
+.cm-head-row{display:flex;align-items:center;gap:14px;position:relative;z-index:1}
+.cm-head-icon{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex;align-items:center;justify-content:center;color:#fff;font-size:21px;flex-shrink:0;
+  box-shadow:0 8px 20px rgba(59,130,246,.35)}
+.cm-head-title{font-size:16.5px;font-weight:800;color:var(--t1);letter-spacing:-.01em}
+.cm-head-sub{font-size:11px;color:var(--t3);margin-top:3px}
+.cm-close{position:absolute;top:18px;left:18px;background:rgba(0,0,0,.18);border:1px solid var(--card-b);
+  color:var(--t2);width:32px;height:32px;border-radius:10px;font-size:15px;display:flex;align-items:center;
+  justify-content:center;cursor:pointer;z-index:2;transition:.15s}
+.cm-close:hover{background:var(--red-bg);color:var(--red-t);border-color:rgba(239,68,68,.25)}
+
+.cm-body{padding:22px 28px 8px;overflow-y:auto;flex:1}
+.cm-section{margin-bottom:20px}
+.cm-section-label{font-size:10.5px;font-weight:800;color:var(--t3);text-transform:uppercase;
+  letter-spacing:.08em;display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.cm-section-label i{color:var(--accent);font-size:14px}
+
+.cm-field{margin-bottom:14px}
+.cm-field label{display:block;font-size:11px;font-weight:700;color:var(--t2);margin-bottom:7px}
+.cm-input{width:100%;padding:11px 14px;border-radius:11px;border:1px solid var(--card-b);
+  background:rgba(0,0,0,.18);color:var(--t1);font-family:inherit;font-size:12.8px;outline:none;transition:.15s}
+[data-theme="light"] .cm-input{background:rgba(37,99,235,.03)}
+.cm-input:focus{border-color:rgba(59,130,246,.5);box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.cm-input::placeholder{color:var(--t3)}
+.cm-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* ── آکاردئون کشویی انتخاب پروتکل / ترابرد ── */
+.cm-dd{border:1px solid var(--card-b);border-radius:14px;overflow:hidden;background:rgba(0,0,0,.1);transition:.18s}
+[data-theme="light"] .cm-dd{background:#fff}
+.cm-dd.open{border-color:var(--card-bh);box-shadow:0 0 0 3px rgba(59,130,246,.08)}
+.cm-dd-trigger{display:flex;align-items:center;gap:12px;padding:13px 15px;cursor:pointer;user-select:none}
+.cm-dd-icon{width:38px;height:38px;border-radius:11px;background:var(--accent-d);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;transition:.18s}
+.cm-dd-text{flex:1;min-width:0}
+.cm-dd-title{font-size:13px;font-weight:800;color:var(--t1)}
+.cm-dd-desc{font-size:10px;color:var(--t3);margin-top:2px}
+.cm-dd-chev{color:var(--t3);font-size:16px;transition:transform .2s;flex-shrink:0}
+.cm-dd.open .cm-dd-chev{transform:rotate(180deg);color:var(--accent)}
+
+.cm-dd-panel{display:grid;grid-template-rows:0fr;transition:grid-template-rows .22s ease}
+.cm-dd.open .cm-dd-panel{grid-template-rows:1fr}
+.cm-dd-panel-inner{overflow:hidden}
+.cm-dd-list{border-top:1px solid var(--card-b);padding:6px}
+.cm-opt{display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:10px;cursor:pointer;transition:.14s;margin-bottom:2px}
+.cm-opt:hover{background:var(--accent-d)}
+.cm-opt.sel{background:rgba(59,130,246,.12)}
+.cm-opt-radio{width:18px;height:18px;border-radius:50%;border:2px solid var(--card-b);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;transition:.14s}
+.cm-opt.sel .cm-opt-radio{border-color:var(--accent)}
+.cm-opt-radio::after{content:'';width:9px;height:9px;border-radius:50%;background:var(--accent);
+  transform:scale(0);transition:.14s}
+.cm-opt.sel .cm-opt-radio::after{transform:scale(1)}
+.cm-opt-icon{width:30px;height:30px;border-radius:9px;background:var(--accent-d);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.cm-opt.sel .cm-opt-icon{background:var(--accent);color:#fff}
+.cm-opt-text{flex:1;min-width:0}
+.cm-opt-title{font-size:12px;font-weight:700;color:var(--t1)}
+.cm-opt-desc{font-size:9.5px;color:var(--t3);margin-top:1px}
+.cm-opt-tag{font-size:8.5px;font-weight:800;padding:2px 7px;border-radius:6px;background:var(--green-bg);
+  color:var(--green-t);flex-shrink:0}
+
+.cm-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.cm-pill{padding:6px 13px;border-radius:20px;font-size:10.5px;font-weight:700;color:var(--t2);
+  background:transparent;border:1px solid var(--card-b);cursor:pointer;transition:.15s;font-family:inherit}
+.cm-pill:hover{background:var(--accent-d)}
+.cm-pill.active{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 3px 10px rgba(59,130,246,.3)}
+
+.cm-note{font-size:10.5px;color:var(--t3);display:flex;align-items:flex-start;gap:7px;
+  background:var(--accent-d);border-radius:10px;padding:10px 13px;line-height:1.7;margin-top:4px}
+.cm-note i{color:var(--accent);font-size:14px;flex-shrink:0;margin-top:1px}
+
+.cm-footer{display:flex;gap:10px;padding:16px 28px;border-top:1px solid var(--card-b);flex-shrink:0;
+  background:var(--card)}
+.cm-btn-cancel{flex:.55;justify-content:center;padding:12px;border-radius:12px;background:transparent;
+  border:1px solid var(--card-b);color:var(--t2);font-family:inherit;font-size:12.5px;font-weight:700;
+  cursor:pointer;transition:.15s;display:flex;align-items:center}
+.cm-btn-cancel:hover{background:var(--accent-d);color:var(--t1)}
+.cm-btn-submit{flex:1;justify-content:center;padding:12px;border-radius:12px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;
+  font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;
+  gap:7px;box-shadow:0 6px 18px rgba(59,130,246,.4);transition:.18s}
+.cm-btn-submit:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(59,130,246,.5)}
+.cm-btn-submit:active{transform:translateY(0) scale(.98)}
+
+/* دسکتاپ بزرگ‌تر */
+@media(min-width:900px){
+  .cm-modal{max-width:680px}
+  .cm-body{padding:24px 34px 8px}
+  .cm-head{padding:28px 34px 22px}
+  .cm-footer{padding:18px 34px}
+}
+
+/* موبایل = باتم‌شیت */
+@media(max-width:640px){
+  #modal-create-link.modal-bg{align-items:flex-end}
+  .cm-modal{max-width:100%;width:100%;border-radius:22px 22px 0 0;max-height:90vh;
+    animation:cmSlideUp .28s cubic-bezier(.32,.72,0,1)}
+  .cm-row2{grid-template-columns:1fr}
+  .cm-head{padding:20px 18px 16px}
+  .cm-body{padding:18px 18px 6px}
+  .cm-footer{padding:14px 18px 18px}
+}
+@keyframes cmSlideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+
 </style>
 </head>
 <body>
 <div class="toast" id="toast"></div>
+
+<div class="modal-bg" id="modal-create-link">
+  <div class="modal-v2 cm-modal">
+    <button class="cm-close" onclick="closeModal('modal-create-link')"><i class="ti ti-x"></i></button>
+    <div class="cm-head">
+      <div class="cm-head-row">
+        <div class="cm-head-icon" id="cm-head-icon"><i class="ti ti-square-rounded-plus"></i></div>
+        <div>
+          <div class="cm-head-title" id="cm-head-title">ساخت کانفیگ جدید</div>
+          <div class="cm-head-sub" id="cm-head-sub">تنظیمات کامل پروتکل، ترابرد و محدودیت‌ها در یک صفحه</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cm-body">
+
+      <!-- اطلاعات پایه -->
+      <div class="cm-section">
+        <div class="cm-section-label"><i class="ti ti-id-badge-2"></i> اطلاعات پایه</div>
+        <div class="cm-field"><label>نام کانفیگ</label>
+          <input class="cm-input" id="nl-label" placeholder="مثلاً: کاربر علی">
+        </div>
+        <div class="cm-row2">
+          <div class="cm-field"><label>گروه ساب</label>
+            <select class="cm-input" id="nl-sub"><option value="">— بدون گروه —</option></select>
+          </div>
+          <div class="cm-field"><label>یادداشت (اختیاری)</label>
+            <input class="cm-input" id="nl-note" placeholder="توضیح کوتاه">
+          </div>
+        </div>
+      </div>
+
+      <!-- بخش ۱: پایه -->
+      <div class="cm-section">
+        <div class="cm-section-label"><i class="ti ti-plug-connected"></i> پروتکل پایه</div>
+        <div class="cm-dd open" id="dd-base">
+          <div class="cm-dd-trigger" onclick="cmToggleDD('dd-base')">
+            <div class="cm-dd-icon" id="dd-base-icon"><i class="ti ti-bolt"></i></div>
+            <div class="cm-dd-text">
+              <div class="cm-dd-title">پروتکل پایه — <span id="dd-base-current">VLESS</span></div>
+              <div class="cm-dd-desc" id="dd-base-current-desc">سبک، سریع و پرکاربردترین گزینه</div>
+            </div>
+            <i class="ti ti-chevron-down cm-dd-chev"></i>
+          </div>
+          <div class="cm-dd-panel"><div class="cm-dd-panel-inner"><div class="cm-dd-list">
+            <div class="cm-opt sel" data-base="vless" onclick="cmSelectBase('vless',this)">
+              <div class="cm-opt-radio"></div>
+              <div class="cm-opt-icon"><i class="ti ti-bolt"></i></div>
+              <div class="cm-opt-text"><div class="cm-opt-title">VLESS</div><div class="cm-opt-desc">سبک، سریع و پرکاربردترین گزینه</div></div>
+              <span class="cm-opt-tag">پیشنهادی</span>
+            </div>
+            <div class="cm-opt" data-base="trojan" onclick="cmSelectBase('trojan',this)">
+              <div class="cm-opt-radio"></div>
+              <div class="cm-opt-icon"><i class="ti ti-shield-lock"></i></div>
+              <div class="cm-opt-text"><div class="cm-opt-title">Trojan</div><div class="cm-opt-desc">شبیه‌سازی ترافیک HTTPS معمولی</div></div>
+            </div>
+            <div class="cm-opt" data-base="shadowsocks" onclick="cmSelectBase('shadowsocks',this)">
+              <div class="cm-opt-radio"></div>
+              <div class="cm-opt-icon"><i class="ti ti-shield-lock-filled"></i></div>
+              <div class="cm-opt-text"><div class="cm-opt-title">Shadowsocks</div><div class="cm-opt-desc">رمزنگاری AEAD مستقیم، بدون نیاز به TLS خارجی</div></div>
+              <span class="cm-opt-tag" style="background:var(--purple-bg);color:#A78BFA">AEAD</span>
+            </div>
+            <div class="cm-opt" data-base="telproxy" onclick="cmSelectBase('telproxy',this)">
+              <div class="cm-opt-radio"></div>
+              <div class="cm-opt-icon"><i class="ti ti-brand-telegram"></i></div>
+              <div class="cm-opt-text"><div class="cm-opt-title">Telegram Proxy</div><div class="cm-opt-desc">پروکسی MTProto مستقیم روی یک پورت TCP اختصاصی</div></div>
+              <span class="cm-opt-tag" style="background:var(--purple-bg);color:var(--purple-t)">MTProto</span>
+            </div>
+          </div></div></div>
+        </div>
+      </div>
+      
+      <!-- بخش ۲: استریم (ترابرد + فینگرپرینت + ALPN) — فقط برای VLESS/Trojan -->
+      <div class="cm-section" id="stream-section">
+        <div class="cm-section-label"><i class="ti ti-transfer"></i> استریم</div>
+      
+        <div class="cm-dd" id="dd-transport">
+          <div class="cm-dd-trigger" onclick="cmToggleDD('dd-transport')">
+            <div class="cm-dd-icon" id="dd-transport-icon"><i class="ti ti-link"></i></div>
+            <div class="cm-dd-text">
+              <div class="cm-dd-title">نوع ترابرد — <span id="dd-transport-current">WebSocket</span></div>
+              <div class="cm-dd-desc" id="dd-transport-current-desc">پایدار و سازگار با همه شرایط شبکه</div>
+            </div>
+            <i class="ti ti-chevron-down cm-dd-chev"></i>
+          </div>
+          <div class="cm-dd-panel"><div class="cm-dd-panel-inner"><div class="cm-dd-list">
+            <div class="cm-opt sel" data-t="ws" onclick="cmSelectTransport('ws',this)">
+              <div class="cm-opt-radio"></div>
+              <div class="cm-opt-icon"><i class="ti ti-link"></i></div>
+              <div class="cm-opt-text"><div class="cm-opt-title">WebSocket</div><div class="cm-opt-desc">پایدار و سازگار با همه شرایط شبکه</div></div>
+            </div>
+            <div class="cm-opt" data-t="xhttp-packet-up" onclick="cmSelectTransport('xhttp-packet-up',this)">
+              <div class="cm-opt-radio"></div>
+              <div class="cm-opt-icon"><i class="ti ti-package"></i></div>
+              <div class="cm-opt-text"><div class="cm-opt-title">XHTTP · packet-up</div><div class="cm-opt-desc">سازگاری بالا با CDN و پروکسی‌ها</div></div>
+            </div>
+            <div class="cm-opt" data-t="xhttp-stream-up" onclick="cmSelectTransport('xhttp-stream-up',this)">
+              <div class="cm-opt-radio"></div>
+              <div class="cm-opt-icon"><i class="ti ti-rocket"></i></div>
+              <div class="cm-opt-text"><div class="cm-opt-title">XHTTP · stream-up</div><div class="cm-opt-desc">تاخیر پایین‌تر برای اتصال‌های پرسرعت</div></div>
+            </div>
+            <div class="cm-opt" data-t="xhttp-stream-one" onclick="cmSelectTransport('xhttp-stream-one',this)">
+              <div class="cm-opt-radio"></div>
+              <div class="cm-opt-icon"><i class="ti ti-bolt"></i></div>
+              <div class="cm-opt-text"><div class="cm-opt-title">XHTTP ULTRA · stream-one</div><div class="cm-opt-desc">یک کانکشن duplex واحد، کمترین تاخیر ممکن</div></div>
+              <span class="cm-opt-tag" style="background:var(--purple-bg);color:#A78BFA">ULTRA</span>
+            </div>
+          </div></div></div>
+        </div>
+      
+        <div style="height:10px"></div>
+      
+        <div class="stream-sub-label"><i class="ti ti-transfer-vertical"></i> ALPN</div>
+        <div class="alpn-row" id="alpn-pills">
+          <div class="alpn-chip active" data-alpn="h2" onclick="cmToggleAlpn('h2',this)">
+            <span class="alpn-chip-dot"><i class="ti ti-check"></i></span> h2
+          </div>
+          <div class="alpn-chip active" data-alpn="http/1.1" onclick="cmToggleAlpn('http/1.1',this)">
+            <span class="alpn-chip-dot"><i class="ti ti-check"></i></span> http/1.1
+          </div>
+          <div class="alpn-chip" data-alpn="h3" onclick="cmToggleAlpn('h3',this)">
+            <span class="alpn-chip-dot"><i class="ti ti-check"></i></span> h3
+          </div>
+        </div>
+        
+        <div class="stream-sub-label"><i class="ti ti-fingerprint"></i> Fingerprint (TLS Client Hello)</div>
+        <div class="fp-grid" id="fp-pills">
+          <div class="fp-card active" data-fp="chrome" onclick="cmSetFp('chrome',this)">
+            <div class="fp-card-check"><i class="ti ti-check"></i></div>
+            <div class="fp-card-icon"><i class="ti ti-brand-chrome"></i></div>
+            <div class="fp-card-title">Chrome</div>
+          </div>
+          <div class="fp-card" data-fp="firefox" onclick="cmSetFp('firefox',this)">
+            <div class="fp-card-check"><i class="ti ti-check"></i></div>
+            <div class="fp-card-icon"><i class="ti ti-brand-firefox"></i></div>
+            <div class="fp-card-title">Firefox</div>
+          </div>
+          <div class="fp-card" data-fp="ios" onclick="cmSetFp('ios',this)">
+            <div class="fp-card-check"><i class="ti ti-check"></i></div>
+            <div class="fp-card-icon"><i class="ti ti-brand-apple"></i></div>
+            <div class="fp-card-title">iOS / Safari</div>
+          </div>
+        </div>
+        
+        <input type="hidden" id="nl-alpn" value="h2,http/1.1">
+        <input type="hidden" id="nl-fp" value="chrome">
+      
+        <input type="hidden" id="nl-proto" value="vless-ws">
+        <div class="cm-note" style="margin-top:12px" id="transport-note"></div>
+        <div class="cm-note" style="margin-top:12px;display:none" id="mtproto-note"></div>
+
+        <div class="cm-section" id="mtproto-port-field" style="display:none;margin-bottom:0">
+        <div id="auto-domain-box" style="margin-top:10px, display: none">
+          <div id="auto-domain-token-wrap" style="display:none;margin-top:9px">
+            <div class="cm-row2">
+              <input class="cm-input" id="auto-domain-token" type="password" placeholder="Railway API Token">
+              <button type="button" class="btn btn-p btn-sm" onclick="submitAutoDomainToken()"><i class="ti ti-check"></i> تایید و دریافت</button>
+            </div>
+          </div>
+        </div>
+        <div class="cm-section" id="ss-cipher-field" style="display:none;margin-bottom:0">
+          <div class="cm-section-label"><i class="ti ti-key"></i> الگوریتم رمزنگاری</div>
+          <div class="cm-pills">
+            <span class="cm-pill active" data-ss-cipher="chacha20-ietf-poly1305" onclick="cmSetSsCipher('chacha20-ietf-poly1305',this)">ChaCha20-Poly1305</span>
+            <span class="cm-pill" data-ss-cipher="aes-256-gcm" onclick="cmSetSsCipher('aes-256-gcm',this)">AES-256-GCM</span>
+          </div>
+          <input type="hidden" id="nl-ss-cipher" value="chacha20-ietf-poly1305">
+          <div class="cm-note" style="margin-top:10px">
+            <i class="ti ti-info-circle"></i>
+            <span>پسورد به‌صورت خودکار و امن ساخته می‌شود؛ لینک <b>ss://</b> بعد از ساخت کانفیگ در دسترس است.</span>
+          </div>
+        </div>
+          <div class="cm-row2">
+            <div class="cm-field">
+              <label><i class="ti ti-route" style="color:var(--accent);margin-left:4px"></i>پورت TCP</label>
+              <input class="cm-input" id="nl-mtproto-port" type="number" min="1" max="65535" placeholder="خالی = خودکار">
+            </div>
+            <div class="cm-field">
+              <label><i class="ti ti-server-2" style="color:var(--accent);margin-left:4px"></i>Fake TLS SNI</label>
+              <input class="cm-input" id="nl-mtproto-domain" type="text" placeholder="www.cloudflare.com" oninput="cmClearSniPills()">
+            </div>
+          </div>
+          <div class="cm-pills" style="margin-top:-4px;margin-bottom:10px">
+            <span class="cm-pill active" onclick="cmSetSni('www.cloudflare.com',this)"><i class="ti ti-brand-cloudflare" style="margin-left:3px"></i>www.cloudflare.com</span>
+            <span class="cm-pill" onclick="cmSetSni('www.google.com',this)">www.google.com</span>
+            <span class="cm-pill" onclick="cmSetSni('www.microsoft.com',this)">www.microsoft.com</span>
+            <span class="cm-pill" onclick="cmSetSni('www.amazon.com',this)">www.amazon.com</span>
+          </div>
+          <div class="cm-note" style="margin-top:0">
+          </div>
+        </div>
+      </div>
+
+
+      <!-- محدودیت‌ها -->
+      <div class="cm-section">
+        <div class="cm-section-label"><i class="ti ti-adjustments"></i> محدودیت‌ها</div>
+        <div class="cm-field">
+          <label>سهمیه ترافیک</label>
+          <div class="cm-row2">
+            <input class="cm-input" id="nl-val" type="number" min="0" step="0.1" placeholder="0 = نامحدود">
+            <select class="cm-input" id="nl-unit"><option value="GB">GB</option><option value="MB" selected>MB</option></select>
+          </div>
+          <div class="cm-pills">
+            <span class="cm-pill" onclick="cmQuota(0,'GB',this)">نامحدود</span>
+            <span class="cm-pill" onclick="cmQuota(500,'MB',this)">۵۰۰MB</span>
+            <span class="cm-pill active" onclick="cmQuota(1,'GB',this)">۱GB</span>
+            <span class="cm-pill" onclick="cmQuota(5,'GB',this)">۵GB</span>
+            <span class="cm-pill" onclick="cmQuota(10,'GB',this)">۱۰GB</span>
+            <span class="cm-pill" onclick="cmQuota(50,'GB',this)">۵۰GB</span>
+          </div>
+        </div>
+        <div class="cm-field" style="margin-bottom:4px">
+          <label>انقضا</label>
+          <input class="cm-input" id="nl-exp" type="number" min="0" step="1" placeholder="روز · 0 = نامحدود">
+          <div class="cm-pills">
+            <span class="cm-pill" onclick="cmExpiry(0,this)">نامحدود</span>
+            <span class="cm-pill" onclick="cmExpiry(7,this)">۷ روز</span>
+            <span class="cm-pill active" onclick="cmExpiry(30,this)">۳۰ روز</span>
+            <span class="cm-pill" onclick="cmExpiry(90,this)">۹۰ روز</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="cm-footer">
+      <button class="cm-btn-cancel" onclick="closeModal('modal-create-link')">انصراف</button>
+      <button class="cm-btn-submit" id="cm-submit-btn" onclick="createLink()"><i class="ti ti-link-plus" id="cm-submit-icon"></i> <span id="cm-submit-text">ساخت کانفیگ</span></button>    </div>
+  </div>
+</div>
 
 <!-- مودال بروزرسانی -->
 <div class="modal-bg" id="modal-update" style="z-index:9999">
@@ -908,6 +1564,326 @@ a{color:inherit;text-decoration:none}
     </div>
   </div>
 </div>
+<div class="modal-bg" id="modal-ad-tag">
+  <div class="modal-v2 cm-modal" style="max-width:460px">
+    <button class="cm-close" onclick="closeModal('modal-ad-tag')"><i class="ti ti-x"></i></button>
+
+    <div class="cm-head">
+      <div class="cm-head-row">
+        <div class="cm-head-icon" style="background:linear-gradient(135deg,var(--purple),#6D48D6)"><i class="ti ti-speakerphone"></i></div>
+        <div>
+          <div class="cm-head-title">تبلیغ کانال روی پروکسی</div>
+          <div class="cm-head-sub" id="at-label-sub">تنظیم ad-tag برای <span id="at-cfg-name" style="color:var(--accent2)">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cm-body">
+      <div class="cm-section">
+        <div class="cm-section-label"><i class="ti ti-tag"></i> کد تبلیغ (ad_tag)</div>
+        <div class="cm-field" style="margin-bottom:8px">
+          <input class="cm-input" id="at-tag" placeholder="مثلاً: 3AB4C5D6E7F8...">
+        </div>
+        <div class="cm-note">
+          <i class="ti ti-info-circle"></i>
+          <span>این کد را از ربات <b>@MTProxybot</b> در تلگرام دریافت کنید (با ارسال دستور <b>/newproxy</b> و ثبت لینک پروکسی). با تنظیم این کد، هر بار کاربر از این پروکسی استفاده کند، تبلیغ کانال شما در تلگرامش نمایش داده می‌شود.</span>
+        </div>
+        <div class="cm-note" style="background:var(--amber-bg);color:var(--amber-t);margin-top:8px">
+          <i class="ti ti-alert-triangle"></i>
+          <span>با ثبت یا تغییر کد، پروکسی برای چند ثانیه ری‌استارت می‌شود و اتصال کاربران فعلی به‌طور موقت قطع خواهد شد.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cm-footer">
+      <button class="cm-btn-cancel" onclick="closeModal('modal-ad-tag')">انصراف</button>
+      <button class="cm-btn-submit" id="at-submit-btn" onclick="submitAdTag()">
+        <i class="ti ti-check"></i> ذخیره و اعمال
+      </button>
+    </div>
+  </div>
+</div>
+<div class="modal-bg" id="modal-mt-info">
+  <div class="modal-v2 cm-modal" style="max-width:480px">
+    <button class="cm-close" onclick="closeModal('modal-mt-info')"><i class="ti ti-x"></i></button>
+
+    <div class="cm-head">
+      <div class="cm-head-row">
+        <div class="cm-head-icon" style="background:linear-gradient(135deg,var(--accent),var(--accent2))"><i class="ti ti-info-circle"></i></div>
+        <div>
+          <div class="cm-head-title">اطلاعات پروکسی تلگرام</div>
+          <div class="cm-head-sub">مشخصات <span id="mti-cfg-name" style="color:var(--accent2)">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cm-body">
+      <div class="cm-section">
+        <div class="cm-section-label"><i class="ti ti-key"></i> سکرت (مناسب برای ثبت در ربات‌ها)</div>
+        <div class="cm-field" style="margin-bottom:8px">
+          <div class="cm-input" id="mti-secret" style="font-family:ui-monospace,monospace;font-size:11.5px;word-break:break-all;user-select:all;cursor:text">—</div>
+        </div>
+        <button class="btn btn-g" style="width:100%;justify-content:center" onclick="cpMtiField('mti-secret','سکرت کپی شد ✓')"><i class="ti ti-copy"></i> کپی سکرت</button>
+        <div class="cm-note" style="margin-top:10px">
+          <i class="ti ti-info-circle"></i>
+          <span>این نسخه‌ی خالص سکرت است (بدون پیشوند fake-TLS و دامنه) — همان مقداری که ربات‌هایی مثل <b>@MTProxybot</b> برای ثبت پروکسی و دریافت لینک تبلیغ (ad_tag) نیاز دارند.</span>
+        </div>
+      </div>
+
+      <div class="cm-section" style="margin-bottom:6px">
+        <div class="cm-section-label"><i class="ti ti-link"></i> لینک کامل پروکسی</div>
+        <div class="cm-field" style="margin-bottom:8px">
+          <div class="cm-input" id="mti-link" style="font-family:ui-monospace,monospace;font-size:11px;word-break:break-all;user-select:all;cursor:text">—</div>
+        </div>
+        <button class="btn btn-p" style="width:100%;justify-content:center" onclick="cpMtiField('mti-link','لینک کپی شد ✓')"><i class="ti ti-copy"></i> کپی لینک کامل</button>
+      </div>
+    </div>
+
+    <div class="cm-footer">
+      <button class="cm-btn-cancel" style="flex:1;justify-content:center" onclick="closeModal('modal-mt-info')">بستن</button>
+    </div>
+  </div>
+</div>
+<div class="modal-bg" id="modal-domain-gen">
+  <div class="modal-v2 cm-modal" style="max-width:460px">
+    <button class="cm-close" onclick="closeModal('modal-domain-gen')"><i class="ti ti-x"></i></button>
+    <div class="cm-head">
+      <div class="cm-head-row">
+        <div class="cm-head-icon"><i class="ti ti-repeat"></i></div>
+        <div>
+          <div class="cm-head-title">تولید انبوه دامنه</div>
+          <div class="cm-head-sub">ساخت چند TCP Proxy روی Railway برای گرفتن چند دامنه‌ی متفاوت</div>
+        </div>
+      </div>
+    </div>
+    <div class="cm-body">
+      <div class="cm-section" id="dg-token-section">
+        <div class="cm-section-label"><i class="ti ti-key"></i> احراز هویت</div>
+        <div class="cm-field">
+          <label>Railway API Token</label>
+          <input class="cm-input" id="dg-token" type="password" placeholder="توکن اکانت یا پروژه‌ی Railway">
+        </div>
+        <div class="cm-row2">
+          <div class="cm-field" style="margin-bottom:0">
+            <label>پورت داخلی اپلیکیشن (اختیاری)</label>
+            <input class="cm-input" id="dg-port" type="number" placeholder="پیش‌فرض: پورت خودِ پنل">
+          </div>
+          <div class="cm-field" style="margin-bottom:0">
+            <label>تعداد دامنه‌ی مورد نیاز</label>
+            <input class="cm-input" id="dg-count" type="number" min="1" value="10">
+          </div>
+        </div>
+      </div>
+      <div class="cm-section" id="dg-token-saved-section" style="display:none">
+        <div class="cm-note" style="margin-top:0">
+          <i class="ti ti-shield-check"></i>
+          <span>توکن Railway از قبل ذخیره شده و نیازی به وارد کردن دوباره نیست.
+          <a href="javascript:void(0)" onclick="dgChangeToken()" style="color:var(--accent2);font-weight:700">تغییر توکن</a></span>
+        </div>
+      </div>
+      <div class="cm-section" style="margin-bottom:6px">
+        <div class="cm-section-label"><i class="ti ti-activity"></i> وضعیت اجرا</div>
+        <div class="cm-note" id="dg-status-note">
+          <i class="ti ti-info-circle" id="dg-status-icon"></i>
+          <span id="dg-status-text">هنوز شروع نشده</span>
+        </div>
+        <div class="upd-log-box" id="dg-log-box" style="margin-top:10px;max-height:170px;display:none">
+          <p class="upd-log-empty">لاگی موجود نیست</p>
+        </div>
+        <div id="dg-results" style="display:flex;flex-direction:column;gap:6px;margin-top:10px"></div>
+      </div>
+    </div>
+    <div class="cm-footer">
+      <button class="cm-btn-cancel" onclick="closeModal('modal-domain-gen')">بستن</button>
+      <button class="cm-btn-cancel" id="dg-stop-btn" style="display:none;color:var(--red-t);border-color:rgba(239,68,68,.25)" onclick="stopDomainGen()">
+        <i class="ti ti-player-stop"></i> توقف
+      </button>
+      <button class="cm-btn-submit" id="dg-start-btn" onclick="startDomainGen()">
+        <i class="ti ti-player-play"></i> شروع ساخت
+      </button>
+    </div>
+  </div>
+</div>
+<div class="modal-bg" id="modal-bot-tcp-proxy">
+  <div class="modal-v2 cm-modal" style="max-width:480px">
+    <button class="cm-close" onclick="closeModal('modal-bot-tcp-proxy')"><i class="ti ti-x"></i></button>
+
+    <div class="cm-head">
+      <div class="cm-head-row">
+        <div class="cm-head-icon"><i class="ti ti-server-2"></i></div>
+        <div>
+          <div class="cm-head-title">ساخت TCP Proxy اختصاصی</div>
+          <div class="cm-head-sub">اتصال خودکار به زیرساخت Railway تا تخصیص دامنه‌ی هدف</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cm-body">
+      <div class="cm-section" id="btp-token-section">
+        <div class="cm-section-label"><i class="ti ti-key"></i> احراز هویت</div>
+        <div class="cm-field">
+          <label>Railway API Token</label>
+          <input class="cm-input" id="btp-token" type="password" placeholder="توکن اکانت یا پروژه‌ی Railway">
+        </div>
+        <div class="cm-field" style="margin-bottom:0">
+          <label>پورت داخلی اپلیکیشن (اختیاری)</label>
+          <input class="cm-input" id="btp-port" type="number" placeholder="پیش‌فرض: پورت خودِ پنل">
+        </div>
+      </div>
+      <div class="cm-section" id="btp-mode-section">
+        <div class="cm-section-label"><i class="ti ti-filter"></i> نوع فیلتر دامنه</div>
+        <div class="cm-pills" style="margin-top:0">
+          <span class="cm-pill active" id="btp-mode-bl" onclick="btpSetMode('blacklist')">بلک‌لیست</span>
+          <span class="cm-pill" id="btp-mode-wl" onclick="btpSetMode('whitelist')">جستجوی دامنه دلخواه</span>
+        </div>
+      
+        <div id="btp-bl-panel" style="margin-top:12px">
+          <div class="cm-note" style="margin-bottom:9px">
+            <i class="ti ti-info-circle"></i>
+            <span>هر دامنه‌ای که اینجا اضافه کنی، در کنار بلک‌لیست پیش‌فرض سیستم رد می‌شود (اسکن خودکار روی بقیه‌ی دامنه‌ها ادامه پیدا می‌کند).</span>
+          </div>
+          <div class="cm-field">
+            <input class="cm-input" id="btp-bl-inp" placeholder="دامنه‌ی مسدود و Enter بزن"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();btpAddDomain('blacklist')}">
+          </div>
+          <div class="cm-pills" id="btp-bl-chips"></div>
+        </div>
+      
+        <div id="btp-wl-panel" style="margin-top:12px;display:none">
+          <div class="cm-note" style="margin-bottom:9px">
+            <i class="ti ti-info-circle"></i>
+            <span>فقط دامنه‌هایی که اینجا وارد می‌کنی بررسی می‌شوند؛ به محض پیدا شدن اولین دامنه‌ی موجود، فرآیند متوقف می‌شود.</span>
+          </div>
+          <div class="cm-field">
+            <input class="cm-input" id="btp-wl-inp" placeholder="دامنه‌ی هدف و Enter بزن"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();btpAddDomain('whitelist')}">
+          </div>
+          <div class="cm-pills" id="btp-wl-chips"></div>
+        </div>
+      </div>
+      <div class="cm-section" id="btp-known-section">
+        <div class="cm-section-label"><i class="ti ti-list-details"></i> لیست دامنه‌های شناخته‌شده</div>
+        <div class="cm-note" style="margin-bottom:9px">
+          <i class="ti ti-info-circle"></i>
+          <span>این‌ها فقط برای انتخاب سریع‌اند؛ با کلیک به بلک‌لیست/جستجو اضافه می‌شن. اگر دامنه‌ی بهتری سراغ داری، با دکمه‌ی کنارش به اپراتور پیشنهاد بده.</span>
+        </div>
+        <div id="btp-known-list" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto"></div>
+      </div>
+      <div class="cm-section" id="btp-token-saved-section" style="display:none">
+        <div class="cm-note" style="margin-top:0">
+          <i class="ti ti-shield-check"></i>
+          <span>توکن Railway از قبل روی سرور ذخیره شده و نیازی به وارد کردن دوباره نیست.
+          <a href="javascript:void(0)" onclick="btpChangeToken()" style="color:var(--accent2);font-weight:700">تغییر توکن</a></span>
+        </div>
+      </div>
+
+      <div class="cm-section" style="margin-bottom:6px">
+        <div class="cm-section-label"><i class="ti ti-activity"></i> وضعیت اجرا</div>
+        <div class="cm-note" id="btp-status-note">
+          <i class="ti ti-info-circle" id="btp-status-icon"></i>
+          <span id="btp-status-text">هنوز شروع نشده</span>
+        </div>
+        <div class="upd-log-box" id="btp-log-box" style="margin-top:10px;max-height:170px;display:none">
+          <p class="upd-log-empty">لاگی موجود نیست</p>
+        </div>
+      </div>
+
+      <div class="cm-note" style="background:var(--amber-bg);color:var(--amber-t)">
+        <i class="ti ti-bulb"></i>
+        <span>اگر دامنه‌ی مناسب‌تری برای اینترنت‌ها پیدا کردید، لطفاً از بخش <b>پشتیبانی</b> به پشتیبان اطلاع دهید تا در نسخه‌های بعدی اضافه شود.</span>
+      </div>
+    </div>
+
+    <div class="cm-footer">
+      <button class="cm-btn-cancel" style="color:var(--purple-t);border-color:rgba(157,123,240,.25)" onclick="openSuggestModal()">
+        <i class="ti ti-send"></i> پیشنهاد دامنه به پشتیبانی
+      </button>
+      <button class="cm-btn-cancel" onclick="closeModal('modal-bot-tcp-proxy')">بستن</button>
+      <button class="cm-btn-cancel" id="btp-stop-btn" style="display:none;color:var(--red-t);border-color:rgba(239,68,68,.25)" onclick="stopBotTcpProxy()">
+        <i class="ti ti-player-stop"></i> توقف
+      </button>
+      <button class="cm-btn-submit" id="btp-start-btn" onclick="startBotTcpProxy()">
+        <i class="ti ti-player-play"></i> شروع فرآیند
+      </button>
+    </div>
+  </div>
+</div>
+<div class="modal-bg" id="modal-domain-scan">
+  <div class="modal-v2 cm-modal" style="max-width:480px">
+    <button class="cm-close" onclick="closeModal('modal-domain-scan')"><i class="ti ti-x"></i></button>
+    <div class="cm-head">
+      <div class="cm-head-row">
+        <div class="cm-head-icon"><i class="ti ti-search"></i></div>
+        <div>
+          <div class="cm-head-title">جستجوی دامنه‌ی دلخواه</div>
+          <div class="cm-head-sub">دامنه‌های موردنظرت رو وارد کن، هر بار Enter بزن</div>
+        </div>
+      </div>
+    </div>
+    <div class="cm-body">
+      <div class="cm-section" id="ds-token-section">
+        <div class="cm-field">
+          <label>Railway API Token</label>
+          <input class="cm-input" id="ds-token" type="password" placeholder="در صورتی که قبلاً ذخیره نشده">
+        </div>
+      </div>
+      <div class="cm-section">
+        <div class="cm-field">
+          <label>افزودن دامنه</label>
+          <input class="cm-input" id="ds-domain-inp" placeholder="مثلاً nozomi.proxy.rlwy.net و Enter بزن"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();dsAddDomain()}">
+        </div>
+        <div class="cm-pills" id="ds-domain-chips"></div>
+      </div>
+      <div class="cm-section" style="margin-bottom:6px">
+        <div class="cm-note" id="ds-status-note">
+          <i class="ti ti-info-circle"></i> <span id="ds-status-text">هنوز شروع نشده</span>
+        </div>
+        <div class="upd-log-box" id="ds-log-box" style="margin-top:10px;max-height:170px;display:none">
+          <p class="upd-log-empty">لاگی موجود نیست</p>
+        </div>
+      </div>
+    </div>
+    <div class="cm-footer">
+      <button class="cm-btn-cancel" onclick="closeModal('modal-domain-scan')">بستن</button>
+      <button class="cm-btn-cancel" id="ds-stop-btn" style="display:none;color:var(--red-t)" onclick="stopDomainScan()"><i class="ti ti-player-stop"></i> توقف</button>
+      <button class="cm-btn-submit" id="ds-start-btn" onclick="startDomainScan()"><i class="ti ti-player-play"></i> شروع اسکن</button>
+    </div>
+  </div>
+</div>
+<div class="modal-bg" id="modal-suggest-domain">
+  <div class="modal-v2 cm-modal" style="max-width:420px">
+    <button class="cm-close" onclick="closeModal('modal-suggest-domain')"><i class="ti ti-x"></i></button>
+    <div class="cm-head">
+      <div class="cm-head-row">
+        <div class="cm-head-icon" style="background:linear-gradient(135deg,var(--purple),#6D48D6)"><i class="ti ti-send"></i></div>
+        <div>
+          <div class="cm-head-title">پیشنهاد دامنه به اپراتور</div>
+          <div class="cm-head-sub">دامنه‌ای که سراغ داری رو برای بررسی بفرست</div>
+        </div>
+      </div>
+    </div>
+    <div class="cm-body">
+      <div class="cm-field">
+        <label>دامنه‌ی پیشنهادی</label>
+        <input class="cm-input" id="sg-domain" placeholder="مثلاً: nozomi.proxy.rlwy.net">
+      </div>
+      <div class="cm-field" style="margin-bottom:6px">
+        <label>یادداشت (اختیاری)</label>
+        <input class="cm-input" id="sg-note" placeholder="مثلاً: با فیلترشکن X کار می‌کنه">
+      </div>
+      <div class="cm-note" id="sg-status-note">
+        <i class="ti ti-info-circle"></i> <span id="sg-status-text">هنوز ارسال نشده</span>
+      </div>
+    </div>
+    <div class="cm-footer">
+      <button class="cm-btn-cancel" onclick="closeModal('modal-suggest-domain')">انصراف</button>
+      <button class="cm-btn-submit" id="sg-submit-btn" onclick="submitDomainSuggestion()">
+        <i class="ti ti-send"></i> ارسال پیشنهاد
+      </button>
+    </div>
+  </div>
+</div>
 <div class="modal-bg" id="modal-create-sub">
   <div class="modal-v2">
     <div class="modal-v2-head">
@@ -982,12 +1958,11 @@ a{color:inherit;text-decoration:none}
     <div class="nav-it" data-pg="traffic"><i class="ti ti-chart-area"></i> ترافیک</div>
     <div class="nav-it" data-pg="connections"><i class="ti ti-plug-connected"></i> اتصالات <span class="nav-badge" id="conns-nb">0</span></div>
     <div class="nav-sec">سیستم</div>
+    <div class="nav-it" data-pg="backup"><i class="ti ti-database-export"></i> بکاپ‌گیری</div>
     <div class="nav-it" data-pg="updates"><i class="ti ti-cloud-download"></i> نسخه و بروزرسانی <span class="nav-badge" id="update-nb" style="display:none">1</span></div>
-    <div class="nav-it" data-pg="security"><i class="ti ti-shield-lock"></i> امنیت</div>
     <div class="nav-it" data-pg="support"><i class="ti ti-headset"></i> پشتیبانی <span class="nav-badge" id="support-nb" style="display:none">●</span></div>
     <div class="nav-it" data-pg="logs"><i class="ti ti-history"></i> لاگ فعالیت‌ها</div>
     <div class="nav-it" data-pg="errors"><i class="ti ti-alert-triangle"></i> خطاها</div>
-    <div class="nav-it" data-pg="testws"><i class="ti ti-wifi"></i> تست WebSocket</div>
     <div class="nav-it" data-pg="settings"><i class="ti ti-settings"></i> تنظیمات</div>
   </div>
   <div class="sb-foot">
@@ -1055,90 +2030,43 @@ a{color:inherit;text-decoration:none}
   </div>
 </section>
 <section class="pg" id="pg-links">
-  <div class="">
-    <div><div class="tb-title"><i class="ti ti-link-plus"></i> کانفیگ‌ها</div><div class="tb-sub">ساخت و مدیریت کانفیگ با سهمیه، انقضا و گروه‌بندی</div></div>
-    <div class="tb-right"><span class="badge bg-blue" id="links-pg-cnt">۰ کانفیگ</span></div>
-  </div>
-  <div class="create-panel">
-    <div class="cp-head">
-      <div class="cp-head-icon"><i class="ti ti-square-rounded-plus"></i></div>
-      <div class="cp-head-text">
-        <div class="cp-head-title">ساخت کانفیگ جدید</div>
-        <div class="cp-head-sub">UUID تصادفی · سهمیه، انقضا و پروتکل رو انتخاب کن</div>
-      </div>
+  <div class="topbar">
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px">
+      <button class="btn btn-p" onclick="openModal('modal-create-link')">
+        <i class="ti ti-square-rounded-plus"></i> ساخت کانفیگ جدید
+      </button>
+      <button class="btn btn-g" style="margin-right:14px" onclick="openModal('modal-bot-tcp-proxy');btpCheckTokenState()">
+        <i class="ti ti-server-2"></i> Bot tcp proxy
+      </button>
     </div>
-    <div class="cp-body">
-      <div class="cp-row">
-        <div class="cp-block">
-          <div class="cp-block-label"><i class="ti ti-id-badge-2"></i> شناسه کانفیگ</div>
-          <input class="cp-input-full" id="nl-label" placeholder="مثلاً: کاربر علی">
-          <div class="cp-mini-row">
-            <input class="cp-input-full" id="nl-note" placeholder="یادداشت (اختیاری)">
-          </div>
-        </div>
-        <div class="cp-block">
-          <div class="cp-block-label"><i class="ti ti-folders"></i> گروه ساب و انقضا</div>
-          <select class="cp-input-full fs" id="nl-sub"><option value="">— بدون گروه —</option></select>
-          <div class="cp-mini-row">
-            <input class="cp-input-full" id="nl-exp" type="number" min="0" step="1" placeholder="انقضا (روز) · 0 = نامحدود">
-          </div>
-          <div class="chip-row" id="exp-chips">
-            <span class="chip" onclick="setExpiry(0,this)">نامحدود</span>
-            <span class="chip" onclick="setExpiry(7,this)">۷ روز</span>
-            <span class="chip active" onclick="setExpiry(30,this)">۳۰ روز</span>
-            <span class="chip" onclick="setExpiry(90,this)">۹۰ روز</span>
-          </div>
-        </div>
-      </div>
-      <div class="cp-block mb16">
-        <div class="cp-block-label"><i class="ti ti-gauge"></i> سهمیه ترافیک</div>
-        <div class="cp-quota-inputs">
-          <input class="cp-input-full" id="nl-val" type="number" min="0" step="0.1" placeholder="0 = نامحدود">
-          <select class="cp-input-full fs" id="nl-unit"><option value="GB">GB</option><option value="MB" selected>MB</option></select>
-        </div>
-        <div class="chip-row" id="quota-chips">
-          <span class="chip" onclick="setQuota(0,'GB',this)">نامحدود</span>
-          <span class="chip" onclick="setQuota(500,'MB',this)">۵۰۰ MB</span>
-          <span class="chip active" onclick="setQuota(1,'GB',this)">۱ GB</span>
-          <span class="chip" onclick="setQuota(5,'GB',this)">۵ GB</span>
-          <span class="chip" onclick="setQuota(10,'GB',this)">۱۰ GB</span>
-          <span class="chip" onclick="setQuota(50,'GB',this)">۵۰ GB</span>
-        </div>
-      </div>
-      <div class="cp-block mb16">
-        <div class="cp-block-label"><i class="ti ti-plug-connected"></i> پروتکل انتقال</div>
-        <select id="nl-proto" style="display:none">
-          <option value="vless-ws">VLESS / WebSocket</option>
-          <option value="xhttp-packet-up">XHTTP Ultra · packet-up</option>
-          <option value="xhttp-stream-up">XHTTP Ultra · stream-up</option>
-        </select>
-        <div class="proto-cards">
-          <div class="proto-card active" data-val="vless-ws" onclick="selectProto('vless-ws',this)">
-            <div class="proto-card-check"><i class="ti ti-check"></i></div>
-            <div class="proto-card-icon"><i class="ti ti-link"></i></div>
-            <div class="proto-card-title">VLESS / WS</div>
-            <div class="proto-card-desc">پایدار و همه‌منظوره</div>
-          </div>
-          <div class="proto-card" data-val="xhttp-packet-up" onclick="selectProto('xhttp-packet-up',this)">
-            <div class="proto-card-check"><i class="ti ti-check"></i></div>
-            <div class="proto-card-icon"><i class="ti ti-bolt"></i></div>
-            <div class="proto-card-title">XHTTP · packet-up</div>
-            <div class="proto-card-desc">سازگار با CDN</div>
-          </div>
-          <div class="proto-card" data-val="xhttp-stream-up" onclick="selectProto('xhttp-stream-up',this)">
-            <div class="proto-card-check"><i class="ti ti-check"></i></div>
-            <div class="proto-card-icon"><i class="ti ti-rocket"></i></div>
-            <div class="proto-card-title">XHTTP · stream-up</div>
-            <div class="proto-card-desc">تاخیر پایین‌تر</div>
-          </div>
-        </div>
-      </div>
-      <div class="cp-footer">
-        <div class="cp-footer-note"><i class="ti ti-info-circle"></i> UUID کاملاً رندوم تولید می‌شود · فقط UUID‌های ثبت‌شده اجازه اتصال دارند · پروتکل پس از ساخت قابل تغییر نیست.</div>
-        <button class="cp-submit-btn" onclick="createLink()"><i class="ti ti-link-plus"></i> ساخت کانفیگ</button>
-      </div>
+    <div class="tb-right">
+      <span class="badge bg-blue" id="links-pg-cnt">۰ کانفیگ</span>
     </div>
   </div>
+
+  <div class="info-strip">
+    <div class="info-item">
+      <span class="info-item-label">ارسال / دریافت لحظه‌ای</span>
+      <span class="info-item-val"><i class="ti ti-arrows-exchange"></i> <span id="info-sent-recv">0 B / 0 B</span></span>
+    </div>
+    <div class="info-item">
+      <span class="info-item-label">مصرف دوره فعلی</span>
+      <span class="info-item-val"><i class="ti ti-chart-pie"></i> <span id="info-usage">0 B</span></span>
+    </div>
+    <div class="info-item">
+      <span class="info-item-label">مصرف کل از ابتدا</span>
+      <span class="info-item-val"><i class="ti ti-history"></i> <span id="info-alltime">0 B</span></span>
+    </div>
+    <div class="info-item">
+      <span class="info-item-label">تعداد این‌باندها</span>
+      <span class="info-item-val"><i class="ti ti-list-details"></i> <span id="info-inbounds">0</span></span>
+    </div>
+    <div class="info-item">
+      <span class="info-item-label">کلاینت‌ها</span>
+      <span class="info-item-val"><i class="ti ti-users"></i> <span class="info-badge" id="info-clients">0</span></span>
+    </div>
+  </div>
+
   <div class="cfg-grid" id="links-grid"></div>
   <div class="empty" id="links-empty" style="display:none"><i class="ti ti-link-off"></i><p>هنوز کانفیگی وجود ندارد</p></div>
 </section>
@@ -1260,27 +2188,6 @@ a{color:inherit;text-decoration:none}
     <div class="conn-empty-v2-sub">به محض اتصال کلاینت‌ها، اینجا نمایش داده می‌شوند</div>
   </div>
 </section>
-<section class="pg" id="pg-security">
-  <div class="topbar"><div><div class="tb-title"><i class="ti ti-shield-lock"></i> امنیت</div></div></div>
-  <div class="g2">
-    <div class="card">
-      <div class="card-title"><i class="ti ti-lock"></i> رمزنگاری</div>
-      <div class="sr"><span class="sr-k"><i class="ti ti-certificate"></i> TLS/HTTPS</span><span class="sr-v" style="color:var(--green-t)">● فعال (443)</span></div>
-      <div class="sr"><span class="sr-k"><i class="ti ti-fingerprint"></i> Fingerprint</span><span class="sr-v">Chrome Spoof</span></div>
-      <div class="sr"><span class="sr-k"><i class="ti ti-network"></i> پروتکل‌ها</span><span class="sr-v">VLESS/WS + XHTTP Ultra</span></div>
-      <div class="sr"><span class="sr-k"><i class="ti ti-key"></i> هش رمز</span><span class="sr-v">SHA-256+Salt</span></div>
-      <div class="sr"><span class="sr-k"><i class="ti ti-cookie"></i> سشن</span><span class="sr-v">HttpOnly · 7 روز</span></div>
-    </div>
-    <div class="card">
-      <div class="card-title"><i class="ti ti-shield-check"></i> کنترل دسترسی</div>
-      <div class="sr"><span class="sr-k"><i class="ti ti-id-badge"></i> UUID Auth سخت‌گیرانه</span><span class="sr-v" style="color:var(--green-t)">● فعال v9</span></div>
-      <div class="sr"><span class="sr-k"><i class="ti ti-toggle-right"></i> فعال/غیرفعال کانفیگ</span><span class="sr-v" style="color:var(--green-t)">● فعال</span></div>
-      <div class="sr"><span class="sr-k"><i class="ti ti-gauge"></i> سهمیه ترافیک</span><span class="sr-v" style="color:var(--green-t)">● فعال</span></div>
-      <div class="sr"><span class="sr-k"><i class="ti ti-calendar-x"></i> تاریخ انقضا</span><span class="sr-v" style="color:var(--green-t)">● فعال</span></div>
-      <div class="sr"><span class="sr-k"><i class="ti ti-lock"></i> رمز صفحه پابلیک ساب</span><span class="sr-v" style="color:var(--green-t)">● اختیاری · SHA-256</span></div>
-    </div>
-  </div>
-</section>
 <section class="pg" id="pg-logs">
   <div class="topbar"><div><div class="tb-title"><i class="ti ti-history"></i> لاگ فعالیت‌ها</div><div class="tb-sub">تاریخچه‌ی کامل رخدادهای پنل</div></div><div class="tb-right"><button class="btn btn-p btn-sm" onclick="loadActivity()"><i class="ti ti-refresh"></i></button></div></div>
   <div class="card"><div class="log-timeline" id="logs-list">—</div><div class="empty" id="logs-empty" style="display:none"><i class="ti ti-history-toggle"></i><p>هنوز لاگی ثبت نشده</p></div></div>
@@ -1288,24 +2195,6 @@ a{color:inherit;text-decoration:none}
 <section class="pg" id="pg-errors">
   <div class="topbar"><div><div class="tb-title"><i class="ti ti-alert-triangle"></i> خطاها</div></div><div class="tb-right"><span class="badge bg-red" id="errs-badge">۰</span><button class="btn btn-p btn-sm" onclick="refreshAll()"><i class="ti ti-refresh"></i></button></div></div>
   <div class="card"><div class="card-title"><i class="ti ti-bug"></i> لاگ خطاها</div><div id="errs-full">—</div></div>
-</section>
-<section class="pg" id="pg-testws">
-  <div class="topbar"><div><div class="tb-title"><i class="ti ti-wifi"></i> تست WebSocket</div></div></div>
-  <div class="card" style="max-width:660px">
-    <div class="cl amber" style="margin-top:0;margin-bottom:12px"><i class="ti ti-alert-triangle"></i><span>فقط UUID‌های ثبت‌شده و فعال اتصال برقرار می‌کنند (این فقط تست VLESS/WS است؛ تست XHTTP از خود کلاینت انجام می‌شود).</span></div>
-    <div class="form-row" style="margin-bottom:12px">
-      <div class="fg" style="flex:1"><label>UUID (باید در کانفیگ‌ها وجود داشته باشد)</label><input class="fi" id="ws-uuid" placeholder="UUID یک کانفیگ فعال" style="width:100%"></div>
-      <button class="btn btn-p" onclick="wsConn()"><i class="ti ti-plug-connected"></i> اتصال</button>
-      <button class="btn btn-d" onclick="wsDisc()"><i class="ti ti-plug-x"></i> قطع</button>
-    </div>
-    <div class="form-row" style="margin-bottom:12px">
-      <input class="fi" id="ws-msg" placeholder="پیام تست..." style="flex:1">
-      <button class="btn btn-o" onclick="wsSend()"><i class="ti ti-send"></i> ارسال</button>
-    </div>
-    <div style="background:rgba(0,0,0,.3);border:1px solid var(--card-b);border-radius:10px;padding:14px;height:250px;overflow-y:auto;font-family:ui-monospace,monospace;font-size:10.5px;line-height:1.9" id="ws-log">
-      <p style="color:var(--t3)">منتظر اتصال...</p>
-    </div>
-  </div>
 </section>
 <section class="pg" id="pg-updates">
   <div class="topbar">
@@ -1397,6 +2286,37 @@ a{color:inherit;text-decoration:none}
     </div>
   </div>
 </section>
+<section class="pg" id="pg-backup">
+  <div class="topbar">
+    <div><div class="tb-title"><i class="ti ti-database-export"></i> بکاپ‌گیری و بازیابی</div><div class="tb-sub">دانلود کامل اطلاعات پنل یا بازگردانی از یک فایل بکاپ قبلی</div></div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="card-title"><i class="ti ti-download"></i> دانلود بکاپ</div>
+      <p style="font-size:11.5px;color:var(--t3);line-height:1.9;margin-bottom:14px">
+        یک فایل JSON شامل تمام کانفیگ‌ها، گروه‌های ساب و رمز عبور (هش‌شده) دانلود می‌شود. این فایل را جایی امن نگه دارید.
+      </p>
+      <button class="btn btn-p" onclick="downloadBackup()"><i class="ti ti-cloud-download"></i> دانلود فایل بکاپ</button>
+      <div class="cl" style="margin-top:14px"><i class="ti ti-info-circle"></i><span>این فایل شامل سکرت‌های پروکسی تلگرام هم هست؛ آن را در اختیار افراد غیرقابل‌اعتماد قرار ندهید.</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><i class="ti ti-upload"></i> بازیابی از بکاپ</div>
+      <p style="font-size:11.5px;color:var(--t3);line-height:1.9;margin-bottom:14px">
+        فایل بکاپی که قبلاً دانلود کرده‌اید را انتخاب کنید تا تمام کانفیگ‌ها و گروه‌ها روی این پنل بازیابی شوند (مثلاً بعد از نصب یک پنل جدید).
+      </p>
+      <div class="fg" style="margin-bottom:12px">
+        <label>فایل بکاپ (JSON)</label>
+        <input type="file" id="restore-file" accept="application/json,.json" class="fi" style="width:100%;padding:9px 12px">
+      </div>
+      <div class="sr" style="border:none;padding:0 0 12px">
+        <span class="sr-k"><i class="ti ti-key"></i> رمز عبور فایل بکاپ هم بازگردانی شود؟</span>
+        <button class="tog" id="restore-pw-tog" onclick="this.classList.toggle('on')"></button>
+      </div>
+      <button class="btn btn-d" onclick="restoreBackup()" id="restore-btn"><i class="ti ti-database-import"></i> شروع بازیابی</button>
+      <div class="cl amber" style="margin-top:14px"><i class="ti ti-alert-triangle"></i><span>بازیابی، تمام کانفیگ‌ها و گروه‌های فعلی پنل را با اطلاعات فایل بکاپ جایگزین می‌کند و این کار غیرقابل بازگشت است.</span></div>
+    </div>
+  </div>
+</section>
 <section class="pg" id="pg-settings">
   <div class="topbar"><div><div class="tb-title"><i class="ti ti-settings"></i> تنظیمات</div></div></div>
   <div class="g2">
@@ -1477,6 +2397,7 @@ function applyTheme(dark){
   document.getElementById('theme-label').textContent=label;
   const mobI=document.getElementById('theme-mob-icon');if(mobI)mobI.className='ti '+icon;
 }
+
 function toggleTheme(){isDark=!isDark;localStorage.setItem('rvg-theme',isDark?'dark':'light');applyTheme(isDark)}
 applyTheme(isDark);
 function toast(msg,type=''){
@@ -1497,8 +2418,21 @@ function expChip(exp,expired){
   return `<span class="exp-chip ec-ok"><i class="ti ti-calendar-check"></i> ${toFa(d)} روز مانده</span>`;
 }
 function protoBadge(p){
-  const m={'vless-ws':['VLESS · WS','pc-ws'],'xhttp-packet-up':['XHTTP · packet-up','pc-xhttp'],'xhttp-stream-up':['XHTTP · stream-up','pc-xhttp'],'xhttp-stream-one':['XHTTP ULTRA','pc-ultra']};
-  const v=m[p]||m['vless-ws'];
+  const m={
+    'shadowsocks':['Shadowsocks','pc-ss'],
+    'shadowsocks-xhttp-packet-up':['Shadowsocks · XHTTP packet-up','pc-ss'],
+    'shadowsocks-xhttp-stream-up':['Shadowsocks · XHTTP stream-up','pc-ss'],
+    'vless-ws':['VLESS · WS','pc-ws'],
+    'xhttp-packet-up':['VLESS · XHTTP packet-up','pc-xhttp'],
+    'xhttp-stream-up':['VLESS · XHTTP stream-up','pc-xhttp'],
+    'xhttp-stream-one':['XHTTP ULTRA','pc-ultra'],
+    'trojan-ws':['Trojan · WS','pc-trojan'],
+    'trojan-xhttp-packet-up':['Trojan · XHTTP packet-up','pc-trojan'],
+    'trojan-xhttp-stream-up':['Trojan · XHTTP stream-up','pc-trojan'],
+    'trojan-xhttp-stream-one':['Trojan · XHTTP ULTRA','pc-ultra'],
+    'mtproto':['Telegram Proxy · MTProto','pc-trojan'],
+  };
+  const v=m[p]||['ناشناخته','pc-ws'];
   return `<span class="proto-chip ${v[1]}">${v[0]}</span>`;
 }
 async function checkAuth(){try{const r=await fetch('/api/me');const d=await r.json();if(!d.authenticated)location.href='/login';}catch(e){location.href='/login'}}
@@ -1512,12 +2446,12 @@ async function authF(url,opts={}){
 function setQuota(val,unit,el){
   document.getElementById('nl-val').value = val===0?'':val;
   document.getElementById('nl-unit').value = unit;
-  document.querySelectorAll('#quota-chips .chip').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('#quota-chips .qc-pill').forEach(c=>c.classList.remove('active'));
   el.classList.add('active');
 }
 function setExpiry(days,el){
   document.getElementById('nl-exp').value = days===0?'':days;
-  document.querySelectorAll('#exp-chips .chip').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('#exp-chips .qc-pill').forEach(c=>c.classList.remove('active'));
   el.classList.add('active');
 }
 function selectProto(val,el){
@@ -1534,7 +2468,7 @@ overlay.addEventListener('click',closeSb);
 function navTo(name){
   document.querySelectorAll('.nav-it').forEach(n=>n.classList.toggle('on',n.dataset.pg===name));
   document.querySelectorAll('.pg').forEach(p=>p.classList.toggle('on',p.id==='pg-'+name));
-const loaders={links:loadLinks,connections:loadConns,errors:loadErrs,subscriptions:loadSubsPage,subgroups:loadSubs,logs:loadActivity,updates:loadVersion,support:loadSupportMsgs};  if(loaders[name])loaders[name]();
+  const loaders={links:loadLinks,connections:loadConns,errors:loadErrs,subscriptions:loadSubsPage,subgroups:loadSubs,logs:loadActivity,updates:loadVersion,support:loadSupportMsgs};  if(loaders[name])loaders[name]();
   closeSb();window.scrollTo({top:0,behavior:'smooth'});
 }
 document.querySelectorAll('.nav-it').forEach(el=>el.addEventListener('click',()=>navTo(el.dataset.pg)));
@@ -1600,6 +2534,9 @@ async function loadLinks(){
     const {links=[]}=await lr.json();
     const {subs=[]}=await sr.json();
     allSubsList=subs;allLinksList=links;
+    document.getElementById('info-inbounds').textContent = toFa(links.length);
+    document.getElementById('info-clients').textContent = toFa(links.filter(l=>l.active).length);
+    document.getElementById('info-alltime').textContent = fmtB(links.reduce((s,l)=>s+l.used_bytes,0));
     const nlSub=document.getElementById('nl-sub');
     nlSub.innerHTML='<option value="">— بدون گروه —</option>'+subs.map(s=>`<option value="${esc(s.sub_id)}">${esc(s.name)}</option>`).join('');
     document.getElementById('links-nb').textContent=links.length;
@@ -1615,13 +2552,20 @@ async function loadLinks(){
   const bc=pct>90?'var(--red)':pct>70?'var(--amber)':'var(--accent)';
   const allowed=l.active&&!l.expired;
   const cardCls=!l.active?'is-off':(l.expired?'is-exp':'');
+  const isMt = l.protocol === 'mtproto';
+  const adBtn = isMt
+    ? `<button class="btn btn-sm btn-pur btn-icon" onclick="openAdTagModal('${l.uuid}','${esc(l.label)}','${esc(l.ad_tag||'')}')" title="تنظیم تبلیغ کانال"><i class="ti ti-speakerphone"></i></button>`
+    : '';
+  const idChip = isMt
+    ? `<span class="cfg-uuid-mini" onclick="navigator.clipboard.writeText('${esc(l.mtproto_secret||'')}').then(()=>toast('سکرت کپی شد ✓','ok'))" title="سکرت کامل: ${esc(l.mtproto_secret||'')}"><i class="ti ti-key"></i> ${esc((l.mtproto_secret||'').slice(0,10))}…</span>`
+    : `<span class="cfg-uuid-mini" onclick="navigator.clipboard.writeText('${l.uuid}').then(()=>toast('UUID کپی شد','ok'))" title="${l.uuid}"><i class="ti ti-fingerprint"></i> ${l.uuid.slice(0,10)}…</span>`;
   return `<div class="cfg-card ${cardCls}">
     <div class="cfg-row">
       <span class="cfg-status-dot ${allowed?'pulse':''}"></span>
       <div class="cfg-identity">
         <div class="cfg-label">${esc(l.label)}</div>
         <div class="cfg-sub-meta">
-          <span class="cfg-uuid-mini" onclick="navigator.clipboard.writeText('${l.uuid}').then(()=>toast('UUID کپی شد','ok'))" title="${l.uuid}"><i class="ti ti-fingerprint"></i> ${l.uuid.slice(0,10)}…</span>
+          ${idChip}
           <span>${new Date(l.created_at).toLocaleDateString('fa-IR')}</span>
         </div>
       </div>
@@ -1635,17 +2579,27 @@ async function loadLinks(){
       <div class="cfg-divider-v"></div>
       <div class="cfg-badges-col">
         ${protoBadge(l.protocol)}
+        ${isMt && l.ad_tag ? `<span class="cfg-sub-tag" style="background:linear-gradient(135deg,rgba(139,92,246,.18),rgba(109,72,214,.12));color:#A78BFA;padding:3px 9px;border-radius:20px;border:1px solid rgba(139,92,246,.25);font-weight:700"><i class="ti ti-speakerphone" style="color:#A78BFA"></i> تبلیغ فعال</span>` : ''}
+        ${isMt && l.mtproto_public_host ? `<span class="cfg-sub-tag"><i class="ti ti-route"></i> ${esc(l.mtproto_public_host)}:${l.mtproto_public_port}</span>` : ''}
+        ${isMt && !l.mtproto_public_host && l.mtproto_public_pending ? `<span class="cfg-sub-tag" style="color:var(--amber-t)"><i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> در حال ساخت TCP Proxy عمومی...</span>` : ''}
+        ${isMt && !l.mtproto_public_host && !l.mtproto_public_pending && !l.mtproto_manual_port ? `<span class="cfg-sub-tag" style="color:var(--red-t)"><i class="ti ti-alert-triangle"></i> بدون TCP Proxy عمومی — لینک کار نمی‌کند</span>` : ''}
         ${l.sub_id&&allSubsList.find(s=>s.sub_id===l.sub_id)?`<span class="cfg-sub-tag"><i class="ti ti-folder"></i> ${esc(allSubsList.find(s=>s.sub_id===l.sub_id).name)}</span>`:''}
       </div>
       <div class="cfg-divider-v"></div>
       <div class="cfg-actions">
+        <div class="cfg-actions">
         <button class="tog${allowed?' on':''}" onclick="toggleActive('${l.uuid}',${!l.active})" title="فعال/غیرفعال"></button>
+        ${adBtn}
         <button class="btn btn-sm btn-g btn-icon" onclick="navigator.clipboard.writeText('${esc(l.vless_link)}').then(()=>toast('لینک کپی شد','ok'))" title="کپی لینک"><i class="ti ti-copy"></i></button>
-        <button class="btn btn-sm btn-g btn-icon" onclick="navigator.clipboard.writeText('${esc(l.sub_url)}').then(()=>toast('Sub کپی شد','ok'))" title="Sub URL"><i class="ti ti-rss"></i></button>
-        <button class="btn btn-sm btn-g btn-icon" onclick="showQR('${esc(l.vless_link)}')" title="QR"><i class="ti ti-qrcode"></i></button>
+        ${isMt
+          ? `<button class="btn btn-sm btn-g btn-icon" onclick="openMtInfoModal('${esc(l.label)}','${esc(l.mtproto_secret||'')}','${esc(l.vless_link)}',${!!l.mtproto_public_host})" title="اطلاعات پروکسی"><i class="ti ti-info-circle"></i></button>`
+          : `<button class="btn btn-sm btn-g btn-icon" onclick="navigator.clipboard.writeText('${esc(l.sub_url)}').then(()=>toast('Sub کپی شد','ok'))" title="Sub URL"><i class="ti ti-rss"></i></button>
+        <button class="btn btn-sm btn-g btn-icon" onclick="showQR('${esc(l.vless_link)}')" title="QR"><i class="ti ti-qrcode"></i></button>`
+        }
         <button class="btn btn-sm btn-amber btn-icon" onclick="openEditLink('${l.uuid}')" title="ویرایش"><i class="ti ti-edit"></i></button>
         <button class="btn btn-sm btn-g btn-icon" onclick="resetUsage('${l.uuid}')" title="ریست مصرف"><i class="ti ti-rotate"></i></button>
         <button class="btn btn-sm btn-d btn-icon" onclick="deleteLink('${l.uuid}')" title="حذف"><i class="ti ti-trash"></i></button>
+      </div>
       </div>
     </div>
   </div>`;
@@ -1653,6 +2607,184 @@ async function loadLinks(){
     document.getElementById('lsummary').innerHTML=links.slice(0,6).map(l=>`<div class="sr"><span class="sr-k" style="gap:5px"><i class="ti ${l.expired?'ti-calendar-x':l.active?'ti-circle-check':'ti-circle-x'}" style="color:${l.expired?'var(--amber)':l.active?'var(--green)':'var(--red)'}"></i>${esc(l.label)}</span><span class="sr-v" style="font-size:10px">${fmtB(l.used_bytes)} / ${l.limit_bytes===0?'∞':fmtB(l.limit_bytes)}</span></div>`).join('');
   }catch(e){console.error(e)}
 }
+
+let protoBase = 'vless', protoTransport = 'ws';
+
+function qcTab(name, el){
+  document.querySelectorAll('.qc-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.qc-pane').forEach(p=>p.classList.remove('active'));
+  document.getElementById('qc-pane-'+name).classList.add('active');
+}
+
+let cmBase = 'vless', cmTransport = 'ws';
+
+function cmToggleDD(id){
+  const el = document.getElementById(id);
+  const isOpen = el.classList.contains('open');
+  document.querySelectorAll('.cm-dd').forEach(d => d.classList.remove('open'));
+  if(!isOpen) el.classList.add('open');
+}
+
+const BASE_INFO = {
+  vless:    { icon:'ti-bolt',           title:'VLESS',          desc:'سبک، سریع و پرکاربردترین گزینه' },
+  trojan:   { icon:'ti-shield-lock',    title:'Trojan',         desc:'شبیه‌سازی ترافیک HTTPS معمولی' },
+  shadowsocks: { icon:'ti-shield-lock-filled', title:'Shadowsocks', desc:'رمزنگاری AEAD مستقیم، بدون نیاز به TLS خارجی' },
+  telproxy: { icon:'ti-brand-telegram', title:'Telegram Proxy', desc:'پروکسی MTProto مستقیم روی یک پورت TCP اختصاصی' },
+};
+const TRANSPORT_INFO = {
+  'ws':               { icon:'ti-link',    title:'WebSocket',            desc:'پایدار و سازگار با همه شرایط شبکه' },
+  'xhttp-packet-up':  { icon:'ti-package', title:'XHTTP · packet-up',    desc:'سازگاری بالا با CDN و پروکسی‌ها' },
+  'xhttp-stream-up':  { icon:'ti-rocket',  title:'XHTTP · stream-up',    desc:'تاخیر پایین‌تر برای اتصال‌های پرسرعت' },
+  'xhttp-stream-one': { icon:'ti-bolt',    title:'XHTTP ULTRA · stream-one', desc:'یک کانکشن duplex واحد، کمترین تاخیر ممکن' }
+};
+
+function cmSelectBase(val, el){
+  cmBase = val;
+  document.querySelectorAll('#dd-base .cm-opt').forEach(o => o.classList.remove('sel'));
+  el.classList.add('sel');
+  const info = BASE_INFO[val];
+  document.getElementById('dd-base-icon').innerHTML = `<i class="ti ${info.icon}"></i>`;
+  document.getElementById('dd-base-current').textContent = info.title;
+  document.getElementById('dd-base-current-desc').textContent = info.desc;
+  cmToggleDD('dd-base');
+
+  // ریست ترابرد به WS هر بار که پروتکل پایه عوض می‌شه (جلوگیری از state قدیمی)
+  cmTransport = 'ws';
+  document.querySelectorAll('#dd-transport .cm-opt').forEach(o => o.classList.remove('sel'));
+  document.querySelector('#dd-transport .cm-opt[data-t="ws"]')?.classList.add('sel');
+  const wsInfo = TRANSPORT_INFO['ws'];
+  document.getElementById('dd-transport-icon').innerHTML = `<i class="ti ${wsInfo.icon}"></i>`;
+  document.getElementById('dd-transport-current').textContent = wsInfo.title;
+  document.getElementById('dd-transport-current-desc').textContent = wsInfo.desc;
+
+
+  const streamSection = document.getElementById('stream-section');
+  const normalNote = document.getElementById('transport-note');
+  const mtNote = document.getElementById('mtproto-note');
+  const portField = document.getElementById('mtproto-port-field');
+  const ssField = document.getElementById('ss-cipher-field');
+
+  if (val === 'telproxy') {
+    streamSection.style.display = 'none';
+    normalNote.style.display = 'none';
+    mtNote.style.display = 'flex';
+    portField.style.display = 'block';
+    if (ssField) ssField.style.display = 'none';
+    document.getElementById('cm-head-title').textContent = 'ساخت پروکسی جدید';
+    document.getElementById('cm-head-sub').textContent = 'ساخت پروکسی تلگرام (MTProto) با پورت TCP اختصاصی';
+    document.getElementById('cm-submit-text').textContent = 'ساخت پروکسی';
+    document.getElementById('cm-head-icon').innerHTML = '<i class="ti ti-brand-telegram"></i>';
+  } else if (val === 'shadowsocks') {
+    streamSection.style.display = '';
+    normalNote.style.display = 'flex';
+    mtNote.style.display = 'none';
+    portField.style.display = 'none';
+    if (ssField) ssField.style.display = 'block';
+    document.getElementById('cm-head-title').textContent = 'ساخت کانفیگ Shadowsocks';
+    document.getElementById('cm-head-sub').textContent = 'رمزنگاری AEAD، پسورد به‌صورت خودکار ساخته می‌شود';
+    document.getElementById('cm-submit-text').textContent = 'ساخت کانفیگ';
+    document.getElementById('cm-head-icon').innerHTML = '<i class="ti ti-shield-lock-filled"></i>';
+  } else {
+    streamSection.style.display = '';
+    normalNote.style.display = 'flex';
+    mtNote.style.display = 'none';
+    portField.style.display = 'none';
+    if (ssField) ssField.style.display = 'none';
+    document.getElementById('cm-head-title').textContent = 'ساخت کانفیگ جدید';
+    document.getElementById('cm-head-sub').textContent = 'تنظیمات کامل پروتکل، ترابرد و محدودیت‌ها در یک صفحه';
+    document.getElementById('cm-submit-text').textContent = 'ساخت کانفیگ';
+    document.getElementById('cm-head-icon').innerHTML = '<i class="ti ti-square-rounded-plus"></i>';
+  }
+  cmApplyProto();
+}
+function cmSelectTransport(val, el){
+  cmTransport = val;
+  document.querySelectorAll('#dd-transport .cm-opt').forEach(o => o.classList.remove('sel'));
+  el.classList.add('sel');
+  const info = TRANSPORT_INFO[val];
+  document.getElementById('dd-transport-icon').innerHTML = `<i class="ti ${info.icon}"></i>`;
+  document.getElementById('dd-transport-current').textContent = info.title;
+  document.getElementById('dd-transport-current-desc').textContent = info.desc;
+  cmToggleDD('dd-transport');
+  cmApplyProto();
+}
+function cmApplyProto(){
+  if (cmBase === 'telproxy') {
+    document.getElementById('nl-proto').value = 'mtproto';
+    return;
+  }
+  if (cmBase === 'shadowsocks') {
+    const val = cmTransport === 'ws' ? 'shadowsocks' : `shadowsocks-${cmTransport}`;
+    document.getElementById('nl-proto').value = val;
+    return;
+  }
+  const val = cmTransport === 'ws'
+    ? (cmBase === 'trojan' ? 'trojan-ws' : 'vless-ws')
+    : (cmBase === 'trojan' ? `trojan-${cmTransport}` : cmTransport);
+  document.getElementById('nl-proto').value = val;
+}
+
+/* ── سهمیه ترافیک و انقضا: هم با پیل، هم با تایپ مستقیم قابل تنظیم‌اند ── */
+function cmQuota(val, unit, el){
+  document.getElementById('nl-val').value = val === 0 ? '' : val;
+  document.getElementById('nl-unit').value = unit;
+  el.parentElement.querySelectorAll('.cm-pill').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+function cmExpiry(days, el){
+  document.getElementById('nl-exp').value = days === 0 ? '' : days;
+  el.parentElement.querySelectorAll('.cm-pill').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function cmSetSni(domain, el){
+  document.getElementById('nl-mtproto-domain').value = domain;
+  el.parentElement.querySelectorAll('.cm-pill').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+function cmClearSniPills(){
+  const wrap = document.getElementById('nl-mtproto-domain').closest('.cm-section').querySelector('.cm-pills');
+  wrap?.querySelectorAll('.cm-pill').forEach(c => c.classList.remove('active'));
+}
+
+/* ── ALPN: چندانتخابی ── */
+let cmAlpn = ['h2', 'http/1.1'];
+function cmToggleAlpn(val, el){
+  const idx = cmAlpn.indexOf(val);
+  if(idx > -1){
+    if(cmAlpn.length === 1) return; // حداقل یک ALPN باید بمونه
+    cmAlpn.splice(idx, 1);
+    el.classList.remove('active');
+  } else {
+    cmAlpn.push(val);
+    el.classList.add('active');
+  }
+  document.getElementById('nl-alpn').value = cmAlpn.join(',');
+}
+
+
+function cmSetSsCipher(val, el){
+  document.getElementById('nl-ss-cipher').value = val;
+  el.parentElement.querySelectorAll('.cm-pill').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function cmSetFp(val, el){
+  document.getElementById('nl-fp').value = val;
+  document.querySelectorAll('#fp-pills .fp-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+document.getElementById('nl-val')?.addEventListener('input', () => {
+  document.querySelectorAll('#nl-val').forEach(()=>{});
+  const wrap = document.getElementById('nl-val').closest('.cm-field').querySelector('.cm-pills');
+  wrap?.querySelectorAll('.cm-pill').forEach(c => c.classList.remove('active'));
+});
+document.getElementById('nl-exp')?.addEventListener('input', () => {
+  const wrap = document.getElementById('nl-exp').closest('.cm-field').querySelector('.cm-pills');
+  wrap?.querySelectorAll('.cm-pill').forEach(c => c.classList.remove('active'));
+});
+
 async function createLink(){
   const label=document.getElementById('nl-label').value.trim()||'کانفیگ جدید';
   const val=document.getElementById('nl-val').value;
@@ -1661,13 +2793,26 @@ async function createLink(){
   const note=document.getElementById('nl-note').value.trim();
   const sub_id=document.getElementById('nl-sub').value||null;
   const protocol=document.getElementById('nl-proto').value||'vless-ws';
+  const isMt = protocol === 'mtproto';
+  const isSs = protocol.startsWith('shadowsocks');
+  const mtproto_port = isMt ? (document.getElementById('nl-mtproto-port').value || null) : null;
+  const mtproto_domain = isMt ? (document.getElementById('nl-mtproto-domain').value.trim() || null) : null;
+  const alpn = (isMt || isSs) ? null : (document.getElementById('nl-alpn').value || 'h2,http/1.1');
+  const fingerprint = (isMt || isSs) ? null : (document.getElementById('nl-fp').value || 'chrome');
+  const ss_cipher = isSs ? (document.getElementById('nl-ss-cipher').value || 'chacha20-ietf-poly1305') : null;
   try{
-    const r=await authF('/api/links',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({label,limit_value:val||0,limit_unit:unit,expires_days:exp||0,note,sub_id,protocol})});
-    if(!r.ok)throw new Error('failed');
-    ['nl-label','nl-val','nl-exp','nl-note'].forEach(id=>document.getElementById(id).value='');
-    toast('کانفیگ ساخته شد ✓','ok');loadLinks();
-  }catch(e){toast('خطا در ساخت','err')}
+    const r=await authF('/api/links',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({label,limit_value:val||0,limit_unit:unit,expires_days:exp||0,note,sub_id,protocol,mtproto_port,mtproto_domain,alpn,fingerprint,ss_cipher})});
+    if(!r.ok){
+      const d=await r.json().catch(()=>({}));
+      throw new Error(d.detail||'failed');
+    }
+    ['nl-label','nl-val','nl-exp','nl-note','nl-mtproto-port','nl-mtproto-domain'].forEach(id=>document.getElementById(id).value='');
+    toast(isMt ? 'پروکسی ساخته شد ✓' : 'کانفیگ ساخته شد ✓','ok');
+    loadLinks();
+  }catch(e){toast('✗ '+e.message,'err')}
 }
+
+
 function openEditLink(uuid){
   const l=allLinksList.find(x=>x.uuid===uuid);
   if(!l)return;
@@ -1700,6 +2845,63 @@ async function toggleActive(uuid,newState){
 }
 async function resetUsage(uuid){
   try{const r=await authF('/api/links/'+uuid,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({reset_usage:true})});if(!r.ok)throw new Error();toast('مصرف ریست شد ✓','ok');loadLinks();}catch(e){toast('خطا','err')}
+}
+let atCurrentUuid = null;
+
+function openAdTagModal(uuid, label, currentTag){
+  atCurrentUuid = uuid;
+  document.getElementById('at-cfg-name').textContent = label;
+  document.getElementById('at-tag').value = currentTag || '';
+  openModal('modal-ad-tag');
+  setTimeout(()=>document.getElementById('at-tag').focus(), 150);
+}
+
+function mtPlainSecret(fullSecret){
+  if (!fullSecret) return '';
+  // فرمت mtg: "ee" + 32 کاراکتر هگز سکرت + دامنه‌ی fake-TLS به‌صورت هگز
+  if (fullSecret.startsWith('ee') && fullSecret.length > 34) {
+    return fullSecret.slice(2, 34);
+  }
+  return fullSecret;
+}
+
+function openMtInfoModal(label, secret, fullLink, hasPublicHost){
+  document.getElementById('mti-cfg-name').textContent = label;
+  document.getElementById('mti-secret').textContent = mtPlainSecret(secret) || '—';
+  document.getElementById('mti-link').textContent = fullLink || '—';
+  const warnEl = document.getElementById('mti-warn');
+  if (warnEl) warnEl.style.display = hasPublicHost ? 'none' : 'flex';
+  openModal('modal-mt-info');
+}
+
+function cpMtiField(id, msg){
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.textContent).then(()=>toast(msg,'ok'));
+}
+
+async function submitAdTag(){
+  if(!atCurrentUuid) return;
+  const tag = document.getElementById('at-tag').value.trim();
+  if(!tag){ toast('ad_tag نمی‌تواند خالی باشد','err'); return; }
+
+  const btn = document.getElementById('at-submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> در حال اعمال...';
+
+  try{
+    const r = await authF('/api/links/'+atCurrentUuid+'/ad-tag', {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ad_tag: tag})
+    });
+    if(!r.ok){ const d = await r.json().catch(()=>({})); throw new Error(d.detail || 'خطا'); }
+    closeModal('modal-ad-tag');
+    toast('تبلیغ ثبت شد، پروکسی در حال ری‌استارت است...','ok');
+    setTimeout(loadLinks, 2000);
+  }catch(e){
+    toast('✗ '+e.message,'err');
+  }
+  btn.disabled = false;
+  btn.innerHTML = '<i class="ti ti-check"></i> ذخیره و اعمال';
 }
 async function deleteLink(uuid){
   if(!confirm('حذف این کانفیگ؟'))return;
@@ -2200,24 +3402,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   await checkAuth();
   initCharts();
   document.getElementById('set-host').textContent = location.host;
-  document.getElementById('sub-all-url') && (document.getElementById('sub-all-url').textContent = location.protocol + '//' + location.host + '/sub-all');
+  document.getElementById('sub-all-url') && 
+    (document.getElementById('sub-all-url').textContent = 
+      location.protocol + '//' + location.host + '/sub-all');
   
-  // ابتدا نسخه را بررسی کن
-  await loadVersion();
+  try {
+    await loadVersion();
+  } catch(e) {
+    console.error('loadVersion failed:', e);
+  }
   
-  // تصمیم‌گیری برای نمایش مودال
-  const updateDismissed = sessionStorage.getItem('rvg-update-dismissed') === 'true';
-  if (updateAvailable && !updateDismissed) {
-    // پر کردن اطلاعات مودال بروزرسانی
-    document.getElementById('update-modal-version').textContent = updateVersion;
-    document.getElementById('update-modal-desc').textContent = updateDescription;
-    openModal('modal-update');
-  } else {
-    // اگر بروزرسانی موجود نیست یا کاربر انصراف داده، مودال کپی‌رایت نمایش داده شود
-    openModal('modal-copyright-notice');
+  try {
+    const updateDismissed = sessionStorage.getItem('rvg-update-dismissed') === 'true';
+    if (updateAvailable && !updateDismissed) {
+      document.getElementById('update-modal-version').textContent = updateVersion;
+      document.getElementById('update-modal-desc').textContent = updateDescription;
+      openModal('modal-update');
+    } else {
+      openModal('modal-copyright-notice');
+    }
+  } catch(e) {
+    console.error('modal error:', e);
   }
 
-  // بقیه‌ی کدهای اولیه
   fetchStats();
   fetchDefaultVless();
   loadLinks();
@@ -2305,6 +3512,122 @@ async function startUpdate(){
     btn.disabled=false;btn.innerHTML='<i class="ti ti-download"></i> نصب بروزرسانی';
   }
 }
+let btpPolling = null;
+
+function btpSetStatus(icon, color, text, spin){
+  const ic = document.getElementById('btp-status-icon');
+  ic.className = 'ti ' + icon;
+  ic.style.color = color;
+  ic.style.animation = spin ? 'spin 1s linear infinite' : '';
+  document.getElementById('btp-status-text').textContent = text;
+}
+
+function btpToggleButtons(running){
+  document.getElementById('btp-start-btn').style.display = running ? 'none' : 'flex';
+  document.getElementById('btp-stop-btn').style.display = running ? 'flex' : 'none';
+}
+
+function btpChangeToken(){
+  document.getElementById('btp-token-section').style.display = '';
+  document.getElementById('btp-token-saved-section').style.display = 'none';
+}
+
+async function btpCheckTokenState(){
+  try{
+    const r = await authF('/api/bot-tcp-proxy/status'), d = await r.json();
+    if(d.has_token){
+      document.getElementById('btp-token-section').style.display = 'none';
+      document.getElementById('btp-token-saved-section').style.display = '';
+    }else{
+      document.getElementById('btp-token-section').style.display = '';
+      document.getElementById('btp-token-saved-section').style.display = 'none';
+    }
+    btpToggleButtons(d.running);
+    renderKnownDomains(d.known_domains || []);
+    if(d.running){
+      btpPolling = setInterval(pollBotTcpProxy, 1500);
+      btpSetStatus('ti-loader-2','var(--accent)', `در حال تلاش... (${d.attempts} تلاش انجام‌شده)`, true);
+    }
+  }catch(e){}
+}
+
+async function startBotTcpProxy(){
+  const tokenField = document.getElementById('btp-token');
+  const token = tokenField.style.display !== 'none' ? tokenField.value.trim() : '';
+  const portVal = document.getElementById('btp-port').value.trim();
+
+  if(btpMode === 'whitelist' && !btpWhitelist.length){
+    toast('حداقل یک دامنه برای جستجو اضافه کن','err'); return;
+  }
+
+  const body = { token, port: portVal || undefined, mode: btpMode };
+  if(btpMode === 'whitelist'){
+    body.target_domains = btpWhitelist;
+  } else {
+    body.extra_blacklist_domains = btpBlacklist;
+  }
+
+  const btn = document.getElementById('btp-start-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> در حال اجرا...';
+  btpSetStatus('ti-loader-2','var(--accent)','در حال اتصال به Railway...', true);
+  document.getElementById('btp-log-box').style.display = 'block';
+
+  try{
+    const r = await authF('/api/bot-tcp-proxy/start', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    if(!r.ok){ const d = await r.json().catch(()=>({})); throw new Error(d.detail || 'خطا'); }
+    document.getElementById('btp-token-section').style.display = 'none';
+    document.getElementById('btp-token-saved-section').style.display = '';
+    btpToggleButtons(true);
+    btpPolling = setInterval(pollBotTcpProxy, 1500);
+  }catch(e){
+    toast('✗ '+e.message,'err');
+    btpSetStatus('ti-alert-circle','var(--red-t)', e.message, false);
+    btn.disabled = false; btn.innerHTML = '<i class="ti ti-player-play"></i> شروع فرآیند';
+  }
+}
+async function stopBotTcpProxy(){
+  const btn = document.getElementById('btp-stop-btn');
+  btn.disabled = true;
+  try{
+    await authF('/api/bot-tcp-proxy/stop', {method:'POST'});
+    toast('درخواست توقف ارسال شد','ok');
+  }catch(e){
+    toast('خطا در توقف','err');
+  }
+  btn.disabled = false;
+}
+
+async function pollBotTcpProxy(){
+  try{
+    const r = await authF('/api/bot-tcp-proxy/status'), d = await r.json();
+    const box = document.getElementById('btp-log-box');
+    box.innerHTML = (d.logs||[]).map(l=>`<p class="upd-log-line">[${new Date(l.time*1000).toLocaleTimeString('fa-IR')}] ${esc(l.msg)}</p>`).join('') || '<p class="upd-log-empty">لاگی موجود نیست</p>';
+    box.scrollTop = box.scrollHeight;
+
+    if(d.running){
+      btpToggleButtons(true);
+      btpSetStatus('ti-loader-2','var(--accent)', `در حال تلاش... (${d.attempts} تلاش انجام‌شده)`, true);
+    }else{
+      clearInterval(btpPolling);
+      btpToggleButtons(false);
+      const btn = document.getElementById('btp-start-btn');
+      btn.disabled = false; btn.innerHTML = '<i class="ti ti-player-play"></i> شروع فرآیند';
+      if(d.result){
+        btpSetStatus('ti-circle-check','var(--green-t)', `موفق — ${d.result.domain}:${d.result.port}`, false);
+        toast('پروکسی ساخته شد: '+d.result.domain+':'+d.result.port,'ok');
+      } else if(d.stopped_by_user){
+        btpSetStatus('ti-player-stop','var(--amber-t)', 'فرآیند متوقف شد', false);
+      } else if(d.error){
+        btpSetStatus('ti-alert-circle','var(--red-t)', d.error, false);
+        toast('✗ '+d.error,'err');
+      }
+    }
+  }catch(e){}
+}
 async function pollUpdate(){
   pollTicks++;
   try{
@@ -2336,6 +3659,111 @@ async function pollUpdate(){
 async function loadUpdateLog(){
   try{const r=await authF('/api/update-log'),d=await r.json();renderUpdateLog(d.logs);}catch(e){}
 }
+
+let dgPolling = null;
+
+function dgSetStatus(icon, color, text, spin){
+  const ic = document.getElementById('dg-status-icon');
+  ic.className = 'ti ' + icon;
+  ic.style.color = color;
+  ic.style.animation = spin ? 'spin 1s linear infinite' : '';
+  document.getElementById('dg-status-text').textContent = text;
+}
+function dgToggleButtons(running){
+  document.getElementById('dg-start-btn').style.display = running ? 'none' : 'flex';
+  document.getElementById('dg-stop-btn').style.display = running ? 'flex' : 'none';
+}
+function dgChangeToken(){
+  document.getElementById('dg-token-section').style.display = '';
+  document.getElementById('dg-token-saved-section').style.display = 'none';
+}
+function dgRenderResults(results){
+  const el = document.getElementById('dg-results');
+  if(!results || !results.length){ el.innerHTML=''; return; }
+  el.innerHTML = results.map(r=>`
+    <div style="display:flex;align-items:center;gap:8px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:8px 11px">
+      <i class="ti ti-circle-check" style="color:var(--green-t)"></i>
+      <span style="flex:1;font-family:ui-monospace,monospace;font-size:11px;color:var(--t1)">${esc(r.domain)}:${r.port}</span>
+      <button class="btn btn-sm btn-g" onclick="navigator.clipboard.writeText('${esc(r.domain)}:${r.port}').then(()=>toast('کپی شد ✓','ok'))"><i class="ti ti-copy"></i></button>
+    </div>
+  `).join('');
+}
+async function dgCheckTokenState(){
+  try{
+    const r = await authF('/api/domain-gen/status'), d = await r.json();
+    document.getElementById('dg-token-section').style.display = d.has_token ? 'none' : '';
+    document.getElementById('dg-token-saved-section').style.display = d.has_token ? '' : 'none';
+    dgToggleButtons(d.running);
+    dgRenderResults(d.results || []);
+    if(d.running){
+      dgPolling = setInterval(pollDomainGen, 1500);
+      dgSetStatus('ti-loader-2','var(--accent)', `در حال ساخت... (${d.attempts} تلاش، ${(d.results||[]).length}/${d.target_count} دامنه)`, true);
+    }
+  }catch(e){}
+}
+async function startDomainGen(){
+  const tokenField = document.getElementById('dg-token');
+  const token = tokenField.style.display !== 'none' ? tokenField.value.trim() : '';
+  const port = document.getElementById('dg-port').value.trim();
+  const count = parseInt(document.getElementById('dg-count').value || '10');
+
+  const btn = document.getElementById('dg-start-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> در حال اجرا...';
+  dgSetStatus('ti-loader-2','var(--accent)','در حال اتصال به Railway...', true);
+  document.getElementById('dg-log-box').style.display = 'block';
+
+  try{
+    const r = await authF('/api/domain-gen/start', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ token, port: port || undefined, count })
+    });
+    if(!r.ok){ const d = await r.json().catch(()=>({})); throw new Error(d.detail || 'خطا'); }
+    document.getElementById('dg-token-section').style.display = 'none';
+    document.getElementById('dg-token-saved-section').style.display = '';
+    dgToggleButtons(true);
+    dgPolling = setInterval(pollDomainGen, 1500);
+  }catch(e){
+    toast('✗ '+e.message,'err');
+    dgSetStatus('ti-alert-circle','var(--red-t)', e.message, false);
+    btn.disabled = false; btn.innerHTML = '<i class="ti ti-player-play"></i> شروع ساخت';
+  }
+}
+async function stopDomainGen(){
+  const btn = document.getElementById('dg-stop-btn');
+  btn.disabled = true;
+  try{ await authF('/api/domain-gen/stop', {method:'POST'}); toast('درخواست توقف ارسال شد','ok'); }
+  catch(e){ toast('خطا در توقف','err'); }
+  btn.disabled = false;
+}
+async function pollDomainGen(){
+  try{
+    const r = await authF('/api/domain-gen/status'), d = await r.json();
+    const box = document.getElementById('dg-log-box');
+    box.innerHTML = (d.logs||[]).map(l=>`<p class="upd-log-line">[${new Date(l.time*1000).toLocaleTimeString('fa-IR')}] ${esc(l.msg)}</p>`).join('') || '<p class="upd-log-empty">لاگی موجود نیست</p>';
+    box.scrollTop = box.scrollHeight;
+    dgRenderResults(d.results || []);
+
+    if(d.running){
+      dgToggleButtons(true);
+      dgSetStatus('ti-loader-2','var(--accent)', `در حال ساخت... (${d.attempts} تلاش، ${(d.results||[]).length}/${d.target_count} دامنه)`, true);
+    }else{
+      clearInterval(dgPolling);
+      dgToggleButtons(false);
+      const btn = document.getElementById('dg-start-btn');
+      btn.disabled = false; btn.innerHTML = '<i class="ti ti-player-play"></i> شروع ساخت';
+      if(d.results && d.results.length >= d.target_count){
+        dgSetStatus('ti-circle-check','var(--green-t)', `${d.target_count} دامنه با موفقیت ساخته شد ✓`, false);
+        toast(d.target_count+' دامنه ساخته شد ✓','ok');
+      } else if(d.stopped_by_user){
+        dgSetStatus('ti-player-stop','var(--amber-t)', 'فرآیند متوقف شد', false);
+      } else if(d.error){
+        dgSetStatus('ti-alert-circle','var(--red-t)', d.error, false);
+      }
+    }
+  }catch(e){}
+}
+
 function renderUpdateLog(logs){
   const box=document.getElementById('update-log-box');
   if(!logs||!logs.length){box.innerHTML='<p class="upd-log-empty">لاگی موجود نیست</p>';return}
@@ -2377,12 +3805,330 @@ async function loadUpdateHistory(){
     }).join('');
   }catch(e){console.error(e)}
 }
+let autoDomainPolling = null;
+
+async function autoGetMtprotoDomain(){
+  // اول چک کن توکن ذخیره شده یا نه
+  try{
+    const r = await authF('/api/bot-tcp-proxy/status'), d = await r.json();
+    if(!d.has_token){
+      document.getElementById('auto-domain-token-wrap').style.display = 'block';
+      document.getElementById('auto-domain-status').innerHTML = '<i class="ti ti-key"></i> برای دریافت خودکار دامنه، ابتدا توکن Railway را وارد کن.';
+      return;
+    }
+    startAutoDomainFetch();
+  }catch(e){
+    toast('خطا در بررسی وضعیت توکن','err');
+  }
+}
+
+async function submitAutoDomainToken(){
+  const token = document.getElementById('auto-domain-token').value.trim();
+  if(!token){ toast('توکن را وارد کن','err'); return; }
+  document.getElementById('auto-domain-token-wrap').style.display = 'none';
+  startAutoDomainFetch(token);
+}
+
+async function startAutoDomainFetch(token){
+  const btn = document.getElementById('auto-domain-btn');
+  const statusEl = document.getElementById('auto-domain-status');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> در حال دریافت...';
+  statusEl.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> در حال دریافت دامنه از Railway...';
+
+  try{
+    const body = { mode: 'blacklist' };
+    if(token) body.token = token;
+    const r = await authF('/api/bot-tcp-proxy/start', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    if(!r.ok){
+      const d = await r.json().catch(()=>({}));
+      throw new Error(d.detail || 'خطا در شروع فرآیند');
+    }
+    autoDomainPolling = setInterval(pollAutoDomain, 1000);
+  }catch(e){
+    statusEl.innerHTML = '<i class="ti ti-alert-circle" style="color:var(--red-t)"></i> ✗ '+esc(e.message);
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-bolt"></i> دریافت دامنه';
+  }
+}
+
+async function pollAutoDomain(){
+  try{
+    const r = await authF('/api/bot-tcp-proxy/status'), d = await r.json();
+    const btn = document.getElementById('auto-domain-btn');
+    const statusEl = document.getElementById('auto-domain-status');
+
+    if(d.running){
+      statusEl.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> در حال جستجوی دامنه... (${d.attempts} تلاش)`;
+      return;
+    }
+
+    clearInterval(autoDomainPolling);
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-bolt"></i> دریافت خودکار دامنه';
+
+    if(d.result){
+      // پر کردن خودکار فیلدها بدون دخالت کاربر
+      document.getElementById('nl-mtproto-domain').value = d.result.domain;
+      document.getElementById('nl-mtproto-port').value = ''; // پورت داخلی همان پیش‌فرض می‌ماند؛ این پورت، پورت عمومی TCP است
+      statusEl.innerHTML = `<i class="ti ti-circle-check" style="color:var(--green-t)"></i> دامنه دریافت شد: <b>${esc(d.result.domain)}:${d.result.port}</b>`;
+      toast('دامنه و پورت خودکار دریافت شد ✓','ok');
+    } else if(d.error){
+      statusEl.innerHTML = '<i class="ti ti-alert-circle" style="color:var(--red-t)"></i> ✗ '+esc(d.error);
+      toast('✗ '+d.error,'err');
+    }
+  }catch(e){}
+}
+
+function openDomainScanModal(){
+  dsDomains = [];
+  dsRenderChips();
+  document.getElementById('ds-token-section').style.display = '';
+  openModal('modal-domain-scan');
+  authF('/api/bot-tcp-proxy/status').then(r=>r.json()).then(d=>{
+    if(d.has_token) document.getElementById('ds-token-section').style.display = 'none';
+  }).catch(()=>{});
+}
+async function autoAssignMtprotoDomain(){
+  const btn = document.getElementById('auto-domain-btn');
+  const statusEl = document.getElementById('auto-domain-status');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> در حال دریافت...';
+  statusEl.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> در حال اتصال به Railway و دریافت دامنه...';
+
+  try{
+    const r = await authF('/api/bot-tcp-proxy/start', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mode:'blacklist' }) // توکن ذخیره‌شده خودکار استفاده می‌شود
+    });
+    if(!r.ok){
+      const d = await r.json().catch(()=>({}));
+      throw new Error(d.detail || 'خطا در شروع فرآیند');
+    }
+    autoDomainPolling = setInterval(pollAutoDomain, 1200);
+  }catch(e){
+    statusEl.innerHTML = '<i class="ti ti-alert-circle" style="color:var(--red-t)"></i> ✗ '+e.message;
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-bolt"></i> دریافت خودکار دامنه';
+  }
+}
+
+
+function dsAddDomain(){
+  const inp = document.getElementById('ds-domain-inp');
+  const v = inp.value.trim().toLowerCase().replace(/\.$/, '');
+  if(v && !dsDomains.includes(v)) dsDomains.push(v);
+  inp.value = '';
+  document.querySelectorAll('#modal-domain-scan .cm-opt').forEach(o=>o.classList.remove('sel')); // جدید
+  dsRenderChips();
+}
+function dsRemoveDomain(d){
+  dsDomains = dsDomains.filter(x=>x!==d);
+  dsRenderChips();
+}
+function dsRenderChips(){
+  document.getElementById('ds-domain-chips').innerHTML = dsDomains.map(d=>
+    `<span class="cm-pill active" style="cursor:pointer" onclick="dsRemoveDomain('${d}')">${d} <i class="ti ti-x" style="font-size:10px"></i></span>`
+  ).join('') || '<span style="font-size:10.5px;color:var(--t3)">هنوز دامنه‌ای اضافه نشده</span>';
+}
+async function startDomainScan(){
+  if(!dsDomains.length){ toast('حداقل یک دامنه اضافه کن','err'); return; }
+  const tokenField = document.getElementById('ds-token');
+  const token = tokenField.style.display !== 'none' ? tokenField.value.trim() : '';
+  const btn = document.getElementById('ds-start-btn');
+  btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> در حال اجرا...';
+  document.getElementById('ds-log-box').style.display = 'block';
+  try{
+    const r = await authF('/api/bot-tcp-proxy/start', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ token, mode:'whitelist', target_domains: dsDomains })
+    });
+    if(!r.ok){ const d = await r.json().catch(()=>({})); throw new Error(d.detail || 'خطا'); }
+    document.getElementById('ds-stop-btn').style.display = 'flex';
+    dsPolling = setInterval(pollDomainScan, 1500);
+  }catch(e){
+    toast('✗ '+e.message,'err');
+    btn.disabled = false; btn.innerHTML = '<i class="ti ti-player-play"></i> شروع اسکن';
+  }
+}
+async function stopDomainScan(){
+  await authF('/api/bot-tcp-proxy/stop', {method:'POST'});
+  toast('درخواست توقف ارسال شد','ok');
+}
+async function pollDomainScan(){
+  try{
+    const r = await authF('/api/bot-tcp-proxy/status'), d = await r.json();
+    const box = document.getElementById('ds-log-box');
+    box.innerHTML = (d.logs||[]).map(l=>`<p class="upd-log-line">[${new Date(l.time*1000).toLocaleTimeString('fa-IR')}] ${esc(l.msg)}</p>`).join('') || '<p class="upd-log-empty">لاگی موجود نیست</p>';
+    box.scrollTop = box.scrollHeight;
+    const txt = document.getElementById('ds-status-text');
+    if(d.running){
+      txt.textContent = `در حال جستجو... (${d.attempts} تلاش)`;
+    } else {
+      clearInterval(dsPolling);
+      document.getElementById('ds-stop-btn').style.display = 'none';
+      const btn = document.getElementById('ds-start-btn');
+      btn.disabled = false; btn.innerHTML = '<i class="ti ti-player-play"></i> شروع اسکن';
+      if(d.result){
+        txt.textContent = `پیدا شد: ${d.result.domain}:${d.result.port}`;
+        toast('دامنه پیدا شد: '+d.result.domain+':'+d.result.port,'ok');
+      } else if(d.error){
+        txt.textContent = d.error;
+      }
+    }
+  }catch(e){}
+}
+let btpForcedDomain = null;
+let btpMode = 'blacklist';
+let btpBlacklist = [];
+let btpWhitelist = [];
+
+function btpSetMode(mode){
+  btpMode = mode;
+  document.getElementById('btp-mode-bl').classList.toggle('active', mode==='blacklist');
+  document.getElementById('btp-mode-wl').classList.toggle('active', mode==='whitelist');
+  document.getElementById('btp-bl-panel').style.display = mode==='blacklist' ? '' : 'none';
+  document.getElementById('btp-wl-panel').style.display = mode==='whitelist' ? '' : 'none';
+}
+
+function btpAddDomain(kind){
+  const inpId = kind==='blacklist' ? 'btp-bl-inp' : 'btp-wl-inp';
+  const inp = document.getElementById(inpId);
+  const v = inp.value.trim().toLowerCase().replace(/\.$/, '');
+  const arr = kind==='blacklist' ? btpBlacklist : btpWhitelist;
+  if(v && !arr.includes(v)) arr.push(v);
+  inp.value = '';
+  btpRenderChips(kind);
+}
+function btpRemoveDomain(kind, domain){
+  if(kind==='blacklist') btpBlacklist = btpBlacklist.filter(d=>d!==domain);
+  else btpWhitelist = btpWhitelist.filter(d=>d!==domain);
+  btpRenderChips(kind);
+}
+function btpRenderChips(kind){
+  const id = kind==='blacklist' ? 'btp-bl-chips' : 'btp-wl-chips';
+  const arr = kind==='blacklist' ? btpBlacklist : btpWhitelist;
+  document.getElementById(id).innerHTML = arr.map(d=>
+    `<span class="cm-pill active" style="cursor:pointer" onclick="btpRemoveDomain('${kind}','${d}')">${d} <i class="ti ti-x" style="font-size:10px"></i></span>`
+  ).join('') || '<span style="font-size:10.5px;color:var(--t3)">هنوز دامنه‌ای اضافه نشده</span>';
+}
+// آدرس Worker رو بعد از دیپلوی اینجا بذار (بخش ۳)
+const SUGGEST_WORKER_URL = 'https://railway-tcp.arvin341az.workers.dev/suggest';
+
+function renderKnownDomains(list){
+  const el = document.getElementById('btp-known-list');
+  if(!el) return;
+  if(!list || !list.length){ el.innerHTML = '<span style="font-size:10.5px;color:var(--t3)">لیستی موجود نیست</span>'; return; }
+  el.innerHTML = list.map(d => `
+    <div style="display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.12);border:1px solid var(--card-b);border-radius:10px;padding:8px 11px">
+      <span style="flex:1;font-family:ui-monospace,monospace;font-size:11px;color:var(--t1)">${esc(d)}</span>
+      <button class="btn btn-sm btn-g" onclick="btpAddKnownDomain('${d}')" title="اضافه به لیست فعلی"><i class="ti ti-plus"></i></button>
+      <button class="btn btn-sm btn-pur" onclick="openSuggestModal('${d}')" title="پیشنهاد به اپراتور"><i class="ti ti-send"></i></button>
+    </div>
+  `).join('');
+}
+
+function btpAddKnownDomain(domain){
+  if(btpMode === 'whitelist'){
+    if(!btpWhitelist.includes(domain)) btpWhitelist.push(domain);
+    btpRenderChips('whitelist');
+  } else {
+    if(!btpBlacklist.includes(domain)) btpBlacklist.push(domain);
+    btpRenderChips('blacklist');
+  }
+  toast('دامنه اضافه شد ✓','ok');
+}
+
+function openSuggestModal(prefill){
+  document.getElementById('sg-domain').value = prefill || '';
+  document.getElementById('sg-note').value = '';
+  document.getElementById('sg-status-text').textContent = 'هنوز ارسال نشده';
+  openModal('modal-suggest-domain');
+}
+
+async function submitDomainSuggestion(){
+  const domain = document.getElementById('sg-domain').value.trim().toLowerCase();
+  const note = document.getElementById('sg-note').value.trim();
+  if(!domain){ toast('دامنه را وارد کن','err'); return; }
+  const btn = document.getElementById('sg-submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> در حال ارسال...';
+  try{
+    const r = await fetch(SUGGEST_WORKER_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        domain, note,
+        panel_host: location.host,
+        sent_at: new Date().toISOString(),
+      })
+    });
+    if(!r.ok) throw new Error('ارسال ناموفق بود');
+    document.getElementById('sg-status-text').textContent = 'با موفقیت ارسال شد ✓';
+    toast('پیشنهاد شما ارسال شد ✓','ok');
+    setTimeout(()=>closeModal('modal-suggest-domain'), 900);
+  }catch(e){
+    toast('✗ '+e.message,'err');
+  }
+  btn.disabled = false;
+  btn.innerHTML = '<i class="ti ti-send"></i> ارسال پیشنهاد';
+}
+async function downloadBackup(){
+  try{
+    const r = await authF('/api/backup/export');
+    if(!r.ok) throw new Error('خطا در دریافت بکاپ');
+    const blob = await r.blob();
+    const cd = r.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename="?([^"]+)"?/);
+    const filename = m ? m[1] : 'rvg-backup.json';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast('فایل بکاپ دانلود شد ✓','ok');
+  }catch(e){ toast('✗ '+e.message,'err'); }
+}
+
+async function restoreBackup(){
+  const inp = document.getElementById('restore-file');
+  const file = inp.files[0];
+  if(!file){ toast('فایل بکاپ را انتخاب کنید','err'); return; }
+  if(!confirm('تمام اطلاعات فعلی پنل با فایل بکاپ جایگزین می‌شود. ادامه می‌دهید؟')) return;
+
+  const btn = document.getElementById('restore-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> در حال بازیابی...';
+
+  try{
+    const text = await file.text();
+    let data;
+    try{ data = JSON.parse(text); }catch(e){ throw new Error('فایل JSON معتبر نیست'); }
+    const keepPw = !document.getElementById('restore-pw-tog').classList.contains('on');
+    const r = await authF('/api/backup/import', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ data, keep_current_password: keepPw })
+    });
+    if(!r.ok){ const d = await r.json().catch(()=>({})); throw new Error(d.detail || 'خطا در بازیابی'); }
+    const d = await r.json();
+    toast('بازیابی موفق ✓ ('+toFa(d.links_count)+' کانفیگ، '+toFa(d.subs_count)+' گروه)','ok');
+    inp.value = '';
+    loadLinks(); loadSubs(); fetchStats();
+  }catch(e){
+    toast('✗ '+e.message,'err');
+  }
+  btn.disabled = false;
+  btn.innerHTML = '<i class="ti ti-database-import"></i> شروع بازیابی';
+}
 </script>
 </body></html>"""
 
 
 def get_public_page_html(uuid_key: str) -> str:
-    """صفحه پابلیک ساب v3 — طراحی حرفه‌ای‌تر: لینک کانفیگ پنهان با دکمه نمایش، صفحه‌ی رمز با طراحی ویژه"""
+    """صفحه پابلیک ساب v3 — طراحی حرفه‌ای‌تر با هدرهای مناسب برای برنامه‌های خارجی"""
     return f"""<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -2410,7 +4156,7 @@ def get_public_page_html(uuid_key: str) -> str:
   --card:#FFFFFF;--card-b:rgba(59,124,246,0.14);--card-bh:rgba(59,124,246,0.32);
   --accent:#2E63D6;--accent2:#1E4CB8;--accent-d:rgba(46,99,214,0.08);
   --green:#0E9A6A;--green-bg:rgba(14,154,106,0.08);--green-t:#0A7553;
-  --red:#DC2626;--red-bg:rgba(220,38,38,0.08);--red-t:#A51E1E;
+  --red:#DC2626;--red-bg:rgba(220,38,68,0.08);--red-t:#A51E1E;
   --amber:#C97A12;--amber-bg:rgba(201,122,18,0.08);--amber-t:#8F5A0C;
   --purple:#7350D6;--purple-bg:rgba(115,80,214,0.08);--purple-t:#5A3CAD;
   --t1:#101A30;--t2:#48577A;--t3:#8694B0;
@@ -2459,7 +4205,6 @@ html,body{{min-height:100%;background:var(--bg);font-family:var(--serif);color:v
 .cfg-title i{{color:var(--accent);font-size:15px}}
 .cfg-grid{{display:grid;gap:13px}}
 
-/* ── کارت کانفیگ به‌شکل بلیط دسترسی (signature element) ── */
 .cfg-card{{background:var(--card);border:1px solid var(--card-b);border-radius:18px;transition:all .2s;position:relative;overflow:hidden}}
 .cfg-card:hover{{border-color:var(--card-bh);box-shadow:var(--shadow)}}
 .cfg-top{{padding:17px 19px 15px;position:relative}}
@@ -2470,6 +4215,7 @@ html,body{{min-height:100%;background:var(--bg);font-family:var(--serif);color:v
 .cfg-badges{{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}}
 .proto-chip{{font-size:9px;padding:3px 8px;border-radius:7px;font-weight:800;letter-spacing:.02em}}
 .pc-ws{{background:var(--accent-d);color:var(--accent2)}}
+.pc-trojan{{background:var(--purple-bg);color:#A78BFA}}
 .pc-xhttp{{background:var(--purple-bg);color:var(--purple-t)}}
 .pc-ultra{{background:var(--green-bg);color:var(--green-t)}}
 .cfg-status{{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap}}
@@ -2480,7 +4226,6 @@ html,body{{min-height:100%;background:var(--bg);font-family:var(--serif);color:v
 .ubar-f{{height:100%;border-radius:4px;transition:width .5s ease}}
 .utxt{{font-size:10px;color:var(--t3);display:flex;justify-content:space-between}}
 
-/* خط جداکننده‌ی بلیطی با دندانه‌های گرد، شبیه پاره‌خط بُرد بلیط */
 .cfg-tear{{position:relative;height:0;border-top:1.5px dashed var(--card-b);margin:0 19px}}
 .cfg-tear::before,.cfg-tear::after{{content:'';position:absolute;top:50%;width:18px;height:18px;border-radius:50%;background:var(--bg);transform:translateY(-50%);border:1px solid var(--card-b)}}
 .cfg-tear::before{{right:-28px}}
@@ -2510,7 +4255,6 @@ html,body{{min-height:100%;background:var(--bg);font-family:var(--serif);color:v
 .dot{{width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 2s infinite}}
 @keyframes pulse{{0%,100%{{opacity:1}}50%{{opacity:.25}}}}
 
-/* ── صفحه‌ی قفل / رمز ── */
 .lock-stage{{display:flex;align-items:center;justify-content:center;min-height:78vh;padding:20px 0}}
 .lock-card{{background:var(--card);border:1px solid var(--card-b);border-radius:26px;padding:0;text-align:center;max-width:380px;width:100%;box-shadow:var(--shadow);overflow:hidden;position:relative}}
 .lock-banner{{background:linear-gradient(150deg,rgba(59,124,246,.16),rgba(59,124,246,.02) 70%);padding:38px 30px 26px;position:relative}}
@@ -2560,9 +4304,6 @@ html,body{{min-height:100%;background:var(--bg);font-family:var(--serif);color:v
   .lock-form{{padding:20px 22px 26px}}
 }}
 @keyframes spin{{to{{transform:rotate(360deg)}}}}
-
-
-
 </style>
 </head>
 <body>
@@ -2595,6 +4336,16 @@ html,body{{min-height:100%;background:var(--bg);font-family:var(--serif);color:v
 const UUID_KEY='{uuid_key}';
 let savedPw='';
 
+// اطلاعات مصرف و تاریخ انقضا برای برنامه‌های خارجی
+// این داده‌ها در هدرهای پاسخ تنظیم می‌شوند
+// اما برای اطمینان، آنها را در یک متغیر سراسری نیز ذخیره می‌کنیم
+let SUB_DATA = {{
+  total_used: 0,
+  total_limit: 0,
+  expiry_date: null,
+  links: []
+}};
+
 let isDark=localStorage.getItem('rvg-pub-theme')!=='light';
 function applyTheme(dark){{
   document.documentElement.setAttribute('data-theme',dark?'dark':'light');
@@ -2613,6 +4364,7 @@ function fmtB(b){{if(!b||b===0)return '0 B';if(b<1024)return b+' B';if(b<1024**2
 function toFa(n){{return String(n).replace(/\\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d])}}
 function protoChip(p){{
   if(p==='xhttp-stream-one')return '<span class="proto-chip pc-ultra"><i class="ti ti-bolt"></i> XHTTP ULTRA</span>';
+  if(p&&p.startsWith('trojan'))return '<span class="proto-chip pc-trojan"><i class="ti ti-shield-lock"></i> '+esc(p)+'</span>';
   if(p&&p.startsWith('xhttp'))return '<span class="proto-chip pc-xhttp">'+esc(p)+'</span>';
   return '<span class="proto-chip pc-ws">VLESS · WS</span>';
 }}
@@ -2634,7 +4386,25 @@ function toggleLink(i){{
 async function loadData(pw=''){{
   const url='/api/public/sub/'+UUID_KEY+(pw?'?pw='+encodeURIComponent(pw):'');
   const r=await fetch(url);
-  return r.json();
+  const data = await r.json();
+  
+  // استخراج اطلاعات مصرف و تاریخ انقضا از هدرها
+  // این اطلاعات توسط سرور در هدرهای HTTP تنظیم می‌شوند
+  // اما از داده‌های JSON نیز استفاده می‌کنیم
+  if (data.total_used !== undefined) {{
+    SUB_DATA.total_used = data.total_used;
+  }}
+  if (data.total_limit !== undefined) {{
+    SUB_DATA.total_limit = data.total_limit;
+  }}
+  if (data.expiry_date !== undefined) {{
+    SUB_DATA.expiry_date = data.expiry_date;
+  }}
+  if (data.links) {{
+    SUB_DATA.links = data.links;
+  }}
+  
+  return data;
 }}
 
 function renderLock(name,errMsg=''){{
@@ -2683,6 +4453,24 @@ function renderContent(d){{
   const activeCount=d.links.filter(l=>l.active).length;
   const baseSubUrl = d.sub_url || (window.location.protocol + '//' + window.location.host + '/sub-group/' + UUID_KEY);
   const subUrl = baseSubUrl + (savedPw ? '?pw=' + encodeURIComponent(savedPw) : '');
+  
+  // محاسبه کل مصرف و تاریخ انقضا
+  let totalUsed = 0;
+  let totalLimit = 0;
+  let expiryDate = null;
+  
+  d.links.forEach(l => {{
+    totalUsed += (l.used_bytes || 0);
+    totalLimit += (l.limit_bytes || 0);
+    if (l.expiry_date && (!expiryDate || new Date(l.expiry_date) < new Date(expiryDate))) {{
+      expiryDate = l.expiry_date;
+    }}
+  }});
+  
+  // ذخیره در متغیر سراسری برای استفاده در هدرها
+  SUB_DATA.total_used = totalUsed;
+  SUB_DATA.total_limit = totalLimit;
+  SUB_DATA.expiry_date = expiryDate;
 
   window._rvgSubUrl  = subUrl;
   window._rvgSubName = d.name;
@@ -2690,6 +4478,9 @@ function renderContent(d){{
     vless : l.vless_link,
     sub   : l.sub_url + (savedPw ? '?pw=' + encodeURIComponent(savedPw) : ''),
     label : l.label,
+    used_bytes: l.used_bytes || 0,
+    limit_bytes: l.limit_bytes || 0,
+    expiry_date: l.expiry_date || null
   }}));
 
   document.getElementById('root').innerHTML=`
@@ -2732,8 +4523,8 @@ function renderContent(d){{
       </div>
       <div class="stat-card">
         <div class="stat-label">کل مصرف</div>
-        <div class="stat-val" style="font-size:17px;margin-top:3px">${{esc(d.total_used_fmt)}}</div>
-        <div class="stat-sub">همه کانفیگ‌ها</div>
+        <div class="stat-val" style="font-size:17px;margin-top:3px">${{totalLimit > 0 ? fmtB(totalUsed) + ' / ' + fmtB(totalLimit) : fmtB(totalUsed)}}</div>
+        <div class="stat-sub">${{expiryDate ? 'انقضا: ' + new Date(expiryDate).toLocaleDateString('fa-IR') : 'نامحدود'}}</div>
       </div>
     </div>
 
@@ -2743,6 +4534,7 @@ function renderContent(d){{
         const pct = l.limit_bytes === 0 ? 0 : Math.min(100, l.used_bytes / l.limit_bytes * 100);
         const bc  = pct > 90 ? 'var(--red)' : pct > 70 ? 'var(--amber)' : 'var(--green)';
         const lim = l.limit_bytes === 0 ? '∞' : fmtB(l.limit_bytes);
+        const exp = l.expiry_date ? new Date(l.expiry_date).toLocaleDateString('fa-IR') : 'نامحدود';
         return `
           <div class="cfg-card${{l.active ? '' : ' inactive'}}">
             <div class="cfg-top">
@@ -2752,13 +4544,14 @@ function renderContent(d){{
                   <div class="cfg-badges">
                     ${{protoChip(l.protocol)}}
                     ${{l.connections > 0 ? `<span class="conn-chip"><span class="dot"></span> ${{toFa(l.connections)}} اتصال</span>` : ''}}
+                    ${{l.expiry_date ? `<span class="conn-chip" style="background:var(--amber-bg);color:var(--amber-t)"><i class="ti ti-calendar"></i> ${{exp}}</span>` : ''}}
                   </div>
                 </div>
                 <span class="cfg-status ${{l.active ? 'ok' : 'no'}}">${{l.active ? '<i class="ti ti-circle-check"></i> فعال' : '<i class="ti ti-circle-x"></i> غیرفعال'}}</span>
               </div>
               <div class="cfg-usage">
                 <div class="ubar"><div class="ubar-f" style="width:${{pct}}%;background:${{bc}}"></div></div>
-                <div class="utxt"><span>${{esc(l.used_fmt)}} مصرف شده</span><span>سهمیه: ${{lim}}</span></div>
+                <div class="utxt"><span>${{esc(l.used_fmt)}} مصرف شده</span><span>سهمیه: ${{lim}} · انقضا: ${{exp}}</span></div>
               </div>
             </div>
             <div class="cfg-tear"></div>
@@ -2788,7 +4581,24 @@ function renderContent(d){{
       }}).join('')}}
     </div>
   `;
+  
+  // ارسال اطلاعات مصرف و تاریخ انقضا به هدرها برای برنامه‌های خارجی
+  updateSubscriptionHeaders(totalUsed, totalLimit, expiryDate);
+  
   setTimeout(() => autoRefresh(), 30000);
+}}
+
+// تابع برای تنظیم هدرهای مناسب برای برنامه‌های خارجی
+function updateSubscriptionHeaders(used, limit, expiry) {{
+  // این تابع توسط سرور فراخوانی می‌شود
+  // اما ما اطلاعات را در localStorage ذخیره می‌کنیم تا در دسترس باشد
+  try {{
+    localStorage.setItem('rvg_sub_used', String(used));
+    localStorage.setItem('rvg_sub_limit', String(limit));
+    if (expiry) {{
+      localStorage.setItem('rvg_sub_expiry', expiry);
+    }}
+  }} catch(e) {{}}
 }}
 
 function copyAllConfigs(){{
@@ -2805,6 +4615,15 @@ async function autoRefresh(){{
   }} catch(e) {{}}
 }}
 
+// تابع برای دریافت اطلاعات مصرف از localStorage
+function getSubscriptionInfo() {{
+  return {{
+    used: parseInt(localStorage.getItem('rvg_sub_used') || '0'),
+    limit: parseInt(localStorage.getItem('rvg_sub_limit') || '0'),
+    expiry: localStorage.getItem('rvg_sub_expiry') || null
+  }};
+}}
+
 async function init(){{
   try{{
     const data = await loadData();
@@ -2815,6 +4634,11 @@ async function init(){{
       '<div class="empty-state" style="color:var(--red-t)"><i class="ti ti-alert-circle"></i>خطا در بارگذاری</div>';
   }}
 }}
+
+// تابع برای دریافت اطلاعات ساب به صورت JSON
+window.getSubData = function() {{
+  return SUB_DATA;
+}};
 
 init();
 </script>

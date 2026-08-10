@@ -12,6 +12,11 @@ from zoneinfo import ZoneInfo
 from urllib.parse import quote
 from collections import deque, defaultdict
 from pathlib import Path
+import bottokentcpproxy
+from protocol.mtproto import mtproto
+from typing import Optional
+import base64
+import botgeneratedomin
 
 from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect, Depends
 from fastapi.responses import Response, HTMLResponse, JSONResponse, RedirectResponse
@@ -43,13 +48,6 @@ SAVE_LOCK = asyncio.Lock()
 
 
 def _get_or_create_secret() -> str:
-    """
-    اولویت با SECRET_KEY محیطی است (اگر دستی ست شده باشد).
-    در غیر این صورت، یک secret را فقط یک‌بار می‌سازد و در یک فایل
-    روی دیسک دائمی (DATA_DIR) ذخیره می‌کند تا در ری‌استارت‌های بعدی
-    (چه توسط آپدیتر با execv، چه ری‌دیپلوی Railway) همیشه همان مقدار
-    خوانده شود و هش رمز عبور / سشن‌ها نامعتبر نشوند.
-    """
     env_secret = os.environ.get("SECRET_KEY")
     if env_secret:
         return env_secret
@@ -108,6 +106,36 @@ async def save_state():
         except Exception as e:
             logger.warning(f"Could not save state: {e}")
 
+
+# ── Debounced save ─────────────────────────────────────────────────────────────
+# هر بار که یک کانکشن (trojan/vless/shadowsocks/xhttp) بسته میشه، schedule_save()
+# صدا زده میشه به‌جای save_state() مستقیم. اگه صدها کانکشن در ثانیه باز و بسته بشن
+# (که برای WebSocket-based transportها عادیه)، save_state() قبلی باعث میشد به همون
+# تعداد، کل state سریالایز و روی دیسک نوشته بشه و event loop تک‌هسته‌ای رو مسدود کنه.
+# اینجا چندین درخواست ذخیره‌سازی که در بازه‌ی SAVE_DEBOUNCE_SECONDS اتفاق بیفتن،
+# در یک نوشتن واحد روی دیسک ادغام میشن.
+SAVE_DEBOUNCE_SECONDS = 2.0
+_save_pending = False
+_save_dirty_again = False
+
+
+async def schedule_save():
+    """نسخه‌ی debounce شده‌ی save_state — برای صدا زدن مکرر و پرتعداد (هر بسته شدن کانکشن) امن است."""
+    global _save_pending, _save_dirty_again
+    if _save_pending:
+        _save_dirty_again = True
+        return
+    _save_pending = True
+    try:
+        while True:
+            _save_dirty_again = False
+            await asyncio.sleep(SAVE_DEBOUNCE_SECONDS)
+            await save_state()
+            if not _save_dirty_again:
+                break
+    finally:
+        _save_pending = False
+
 # ── In-memory state ───────────────────────────────────────────────────────────
 connections: dict = {}
 stats = {
@@ -125,12 +153,14 @@ LINKS_LOCK = asyncio.Lock()
 SUBS: dict = {}
 SUBS_LOCK = asyncio.Lock()
 
-# پروتکل‌های پشتیبانی‌شده برای هر کانفیگ
-PROTOCOLS = ("vless-ws", "xhttp-packet-up", "xhttp-stream-up", "xhttp-stream-one")
+PROTOCOLS = (
+    "vless-ws", "xhttp-packet-up", "xhttp-stream-up", "xhttp-stream-one",
+    "trojan-ws", "trojan-xhttp-packet-up", "trojan-xhttp-stream-up", "trojan-xhttp-stream-one",
+    "mtproto", "shadowsocks", "shadowsocks-xhttp-packet-up", "shadowsocks-xhttp-stream-up",
+)
 DEFAULT_PROTOCOL = "vless-ws"
 
 def log_activity(kind: str, message: str, level: str = "info"):
-    """ثبت یک رخداد در لاگ فعالیت‌ها (ساخت/حذف/ویرایش کانفیگ، ورود، و...)."""
     activity_logs.append({
         "kind": kind,
         "level": level,
@@ -138,7 +168,6 @@ def log_activity(kind: str, message: str, level: str = "info"):
         "time": datetime.now().isoformat(),
     })
 
-asyncio.create_task(central.heartbeat_loop())
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 SESSION_COOKIE = "rvg_session"
@@ -184,6 +213,7 @@ async def require_auth(request: Request):
 # ── Startup / Shutdown ────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup():
+    asyncio.create_task(central.heartbeat_loop())
     global http_client
     limits = httpx.Limits(max_connections=500, max_keepalive_connections=100)
     timeout = httpx.Timeout(30.0, connect=10.0)
@@ -191,12 +221,165 @@ async def startup():
         limits=limits, timeout=timeout, follow_redirects=True,
     )
     await load_state()
+    await _restart_mtproto_instances()
     log_activity("system", "سرور راه‌اندازی شد", "ok")
     logger.info(f"RVG Gateway v9.2 started on port {CONFIG['port']}")
+
+async def _restart_mtproto_instances():
+    async with LINKS_LOCK:
+        targets = [
+            (uid, d) for uid, d in LINKS.items()
+            if d.get("protocol") == "mtproto" and d.get("active", True)
+        ]
+    for uid, d in targets:
+        try:
+            inst = await mtproto.start_instance(
+                uid,
+                secret=d.get("mtproto_secret"),
+                domain=d.get("mtproto_domain", mtproto.DEFAULT_FAKE_TLS_DOMAIN),
+                preferred_port=d.get("mtproto_port"),
+                force_port=d.get("mtproto_manual_port", False),
+                ad_tag=d.get("ad_tag"),
+            )
+            old_port = d.get("mtproto_port")
+            async with LINKS_LOCK:
+                LINKS[uid]["mtproto_port"] = inst["port"]
+                LINKS[uid]["mtproto_secret"] = inst["secret"]
+
+            if (d.get("mtproto_proxy_id") and inst["port"] != old_port
+                    and not d.get("mtproto_manual_port", False)):
+                asyncio.create_task(_reattach_mtproto_public_proxy(
+                    uid, inst["port"], d.get("mtproto_proxy_id"), d.get("label", "")
+                ))
+        except Exception as exc:
+            logger.error(f"ری‌استارت خودکار MTProto ناموفق برای {uid[:8]}: {exc}")
+
+async def _mtproto_usage_callback(uuid: str, n_bytes: int) -> bool:
+    async with LINKS_LOCK:
+        link = LINKS.get(uuid)
+        if link is None:
+            return False
+        if not is_link_allowed(link):
+            return False
+        link["used_bytes"] += n_bytes
+        stats["total_bytes"] += n_bytes
+        hourly_traffic[now_ir().strftime("%H:00")] += n_bytes
+    return True
+
+mtproto.set_usage_callback(_mtproto_usage_callback)
+
+async def _attach_mtproto_public_proxy(uid: str, application_port: int, label: str):
+    try:
+        pub = await bottokentcpproxy.create_public_proxy_for_port(application_port)
+    except Exception as exc:
+        logger.warning(f"TCP Proxy عمومی برای {uid[:8]} ناموفق بود: {exc}")
+        async with LINKS_LOCK:
+            if uid in LINKS:
+                LINKS[uid]["mtproto_public_pending"] = False
+        log_activity("link", f"ساخت TCP Proxy عمومی برای «{label}» ناموفق بود: {exc}", "err")
+        return
+    async with LINKS_LOCK:
+        if uid in LINKS:
+            LINKS[uid]["mtproto_public_host"] = pub["domain"]
+            LINKS[uid]["mtproto_public_port"] = pub["port"]
+            LINKS[uid]["mtproto_proxy_id"] = pub["id"]
+            LINKS[uid]["mtproto_public_pending"] = False
+    asyncio.create_task(save_state())
+    log_activity("link", f"TCP Proxy عمومی «{label}» آماده شد ({pub['domain']}:{pub['port']})", "ok")
+
+async def _reattach_mtproto_public_proxy(uid: str, new_port: int, old_proxy_id: Optional[str], label: str):
+    if old_proxy_id:
+        await bottokentcpproxy.delete_public_proxy(old_proxy_id)
+    await _attach_mtproto_public_proxy(uid, new_port, label)
+
+# ===== تابع جدید برای به‌روزرسانی ad_tag روی پروکسی =====
+async def _update_mtproto_ad_tag(uuid: str, ad_tag: str):
+    try:
+        # اسنپ‌شات اولیه‌ی لینک قبل از هر کاری - برای مقایسه‌ی پورت قدیم/جدید لازم است
+        async with LINKS_LOCK:
+            link = LINKS.get(uuid)
+            if not link:
+                return
+            old_port = link.get("mtproto_port")
+            old_proxy_id = link.get("mtproto_proxy_id")
+            manual_port = link.get("mtproto_manual_port", False)
+            label = link.get("label", "")
+            secret = link.get("mtproto_secret")
+            domain = link.get("mtproto_domain", mtproto.DEFAULT_FAKE_TLS_DOMAIN)
+
+        await mtproto.stop_instance(uuid)
+
+        try:
+            # force_port=True همیشه: چون تازه instance رو stop کردیم، پورت قدیمی
+            # قطعاً باید آزاد باشه. اگر force_port=False بذاریم و پورت به هر دلیلی
+            # (مثلاً TIME_WAIT) هنوز آزاد نشده بود، mtg یک پورت داخلی جدید و تصادفی
+            # انتخاب می‌کند و TCP Proxy عمومی روی Railway (که آدرسش را کاربر در
+            # @MTProxybot ثبت کرده) دیگر به mtg جدید اشاره نمی‌کند — دقیقاً همین
+            # چیزی بود که باعث می‌شد تبلیغ (ad_tag) کار نکند.
+            inst = await mtproto.start_instance(
+                uuid,
+                secret=secret,
+                domain=domain,
+                preferred_port=old_port,
+                force_port=True,
+                ad_tag=ad_tag,
+            )
+        except RuntimeError as exc:
+
+            logger.warning(
+                f"MTProto[{uuid[:8]}]: گرفتن دوباره‌ی پورت قبلی {old_port} برای "
+                f"ad_tag ناموفق بود ({exc})، تلاش با پورت جدید..."
+            )
+            inst = await mtproto.start_instance(
+                uuid,
+                secret=secret,
+                domain=domain,
+                preferred_port=None,
+                force_port=False,
+                ad_tag=ad_tag,
+            )
+
+        async with LINKS_LOCK:
+            link = LINKS.get(uuid)
+            if not link:
+                # لینک در حین ری‌استارت حذف شده؛ instance تازه‌ساز را متوقف کن
+                asyncio.create_task(mtproto.stop_instance(uuid))
+                return
+            link["mtproto_port"] = inst["port"]
+            link["mtproto_secret"] = inst["secret"]
+            link["mtproto_domain"] = inst["domain"]
+            link["ad_tag"] = ad_tag
+            link["ad_tag_status"] = "done"
+            link["ad_tag_link"] = generate_share_link(
+                uuid, get_host(), remark=f"RVG-{link.get('label','')}", protocol="mtproto"
+            )
+
+        if old_proxy_id and inst["port"] != old_port and not manual_port:
+            asyncio.create_task(_reattach_mtproto_public_proxy(
+                uuid, inst["port"], old_proxy_id, label
+            ))
+
+        asyncio.create_task(save_state())
+        logger.info(
+            f"MTProto[{uuid[:8]}]: ad_tag به‌روز شد، instance ری‌استارت شد "
+            f"(port={inst['port']}, تغییر پورت={inst['port'] != old_port})"
+        )
+        log_activity("link", f"تبلیغ کانال برای «{label}» با موفقیت اعمال شد", "ok")
+
+    except Exception as exc:
+        logger.error(f"خطا در به‌روزرسانی ad_tag برای {uuid[:8]}: {exc}")
+        async with LINKS_LOCK:
+            if uuid in LINKS:
+                LINKS[uuid]["active"] = False
+                LINKS[uuid]["ad_tag_status"] = "error"
+        log_activity("link", f"به‌روزرسانی ad_tag برای «{LINKS.get(uuid,{}).get('label','')}» ناموفق بود", "err")
+        asyncio.create_task(save_state())
+
 
 @app.on_event("shutdown")
 async def shutdown():
     await save_state()
+    await mtproto.stop_all()
     if http_client:
         await http_client.aclose()
 
@@ -207,12 +390,55 @@ def get_host() -> str:
 def generate_uuid() -> str:
     h = secrets.token_hex(16)
     return f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}"
-    
+
 def now_ir() -> datetime:
     return datetime.now(IRAN_TZ)
 
-def generate_vless_link(uuid: str, host: str, remark: str = "RVG", protocol: str = DEFAULT_PROTOCOL) -> str:
-    """می‌سازد VLESS share-link متناسب با پروتکل انتخاب‌شده (WS کلاسیک یا یکی از مدهای XHTTP)."""
+def generate_share_link(uuid: str, host: str, remark: str = "RVG", protocol: str = DEFAULT_PROTOCOL) -> str:
+    link = LINKS.get(uuid) or {}
+    alpn = link.get("alpn", "h2,http/1.1")
+    fp = link.get("fingerprint", "chrome")
+
+    if protocol == "mtproto":
+        port = link.get("mtproto_port")
+        secret = link.get("mtproto_secret")
+        if not port or not secret:
+            return f"tg://proxy?server={host}&port=0&secret=not_ready#{quote(remark)}"
+        pub_host = link.get("mtproto_public_host")
+        pub_port = link.get("mtproto_public_port")
+        final_host = pub_host or host
+        final_port = pub_port or port
+        return mtproto.generate_mtproto_link(final_host, final_port, secret)
+
+    if protocol == "shadowsocks":
+        cipher = link.get("ss_cipher", DEFAULT_CIPHER)
+        password = link.get("ss_password", "")
+        return generate_ss_link(host, 443, cipher, password, remark)
+
+    if protocol.startswith("shadowsocks-xhttp-"):
+        mode = protocol.replace("shadowsocks-xhttp-", "")
+        cipher = link.get("ss_cipher", DEFAULT_CIPHER)
+        password = link.get("ss_password", "")
+        return generate_ss_xhttp_link(uuid, host, 443, cipher, password, remark, mode)
+
+    if protocol == "trojan-ws":
+        params = {
+            "security": "tls", "type": "ws", "host": host,
+            "path": "/trojan-ws", "sni": host, "fp": fp, "alpn": alpn,
+        }
+        query = "&".join(f"{k}={quote(str(v))}" for k, v in params.items())
+        return f"trojan://{uuid}@{host}:443?{query}#{quote(remark)}"
+
+    if protocol.startswith("trojan-xhttp-"):
+        mode = protocol.replace("trojan-xhttp-", "")
+        path = f"/txhttp-siz10/{mode}/{uuid}"
+        params = {
+            "security": "tls", "type": "xhttp", "mode": mode, "host": host,
+            "path": path, "sni": host, "fp": fp, "alpn": alpn,
+        }
+        query = "&".join(f"{k}={quote(str(v))}" for k, v in params.items())
+        return f"trojan://{uuid}@{host}:443?{query}#{quote(remark)}"
+
     if protocol == "vless-ws":
         path = f"/ws/{uuid}"
         params = {
@@ -222,12 +448,11 @@ def generate_vless_link(uuid: str, host: str, remark: str = "RVG", protocol: str
             "host": host,
             "path": path,
             "sni": host,
-            "fp": "chrome",
-            "alpn": "http/1.1",
+            "fp": fp,
+            "alpn": alpn,
         }
     else:
-        # xhttp-packet-up / xhttp-stream-up / xhttp-stream-one
-        mode = protocol.replace("xhttp-", "")  # packet-up | stream-up | stream-one
+        mode = protocol.replace("xhttp-", "")
         path = f"/xhttp-siz10/{mode}/{uuid}"
         params = {
             "encryption": "none",
@@ -237,8 +462,8 @@ def generate_vless_link(uuid: str, host: str, remark: str = "RVG", protocol: str
             "host": host,
             "path": path,
             "sni": host,
-            "fp": "chrome",
-            "alpn": "h2,http/1.1",
+            "fp": fp,
+            "alpn": alpn,
         }
     query = "&".join(f"{k}={quote(str(v))}" for k, v in params.items())
     return f"vless://{uuid}@{host}:443?{query}#{quote(remark)}"
@@ -282,8 +507,24 @@ def fmt_bytes(b: int) -> str:
     if b < 1024**3: return f"{b/1024**2:.2f} MB"
     return f"{b/1024**3:.2f} GB"
 
+def build_sub_headers(label: str, used_bytes: int, limit_bytes: int, expires_at: str | None, support_url: str = "https://t.me/CodeBoxo") -> dict:
+    total = limit_bytes if limit_bytes > 0 else 0
+    expire_ts = 0
+    if expires_at:
+        try:
+            expire_ts = int(datetime.fromisoformat(expires_at).timestamp())
+        except Exception:
+            expire_ts = 0
+    userinfo = f"upload=0; download={used_bytes}; total={total}; expire={expire_ts}"
+    title_b64 = base64.b64encode(label.encode("utf-8")).decode()
+    return {
+        "profile-title": f"base64:{title_b64}",
+        "subscription-userinfo": userinfo,
+        "profile-update-interval": "6",
+        "support-url": support_url,
+    }
+
 def client_ip(request: Request) -> str:
-    """آی‌پی واقعی کلاینت رو با احتساب هدرهای پراکسی (Railway/Cloudflare) برمی‌گردونه."""
     fwd = request.headers.get("x-forwarded-for")
     if fwd:
         return fwd.split(",")[0].strip()
@@ -331,33 +572,37 @@ async def health():
 # ── Subscription (single link) ────────────────────────────────────────────────
 @app.get("/sub/{uuid}")
 async def subscription_single(uuid: str):
-    import base64
     async with LINKS_LOCK:
         link = LINKS.get(uuid)
     if not link or not is_link_allowed(link):
         raise HTTPException(status_code=404, detail="not found or inactive")
     host = get_host()
     proto = link.get("protocol", DEFAULT_PROTOCOL)
-    vless = generate_vless_link(uuid, host, remark=f"RVG-{link['label']}", protocol=proto)
+    vless = generate_share_link(uuid, host, remark=f"RVG-{link['label']}", protocol=proto)
     content = base64.b64encode(vless.encode()).decode()
-    return Response(content=content, media_type="text/plain",
-                    headers={"profile-title": quote(link["label"]), "support-url": "https://t.me/CodeBoxo"})
+    headers = build_sub_headers(link["label"], link.get("used_bytes", 0), link.get("limit_bytes", 0), link.get("expires_at"))
+    return Response(content=content, media_type="text/plain", headers=headers)
 
 @app.get("/sub-all")
 async def subscription_all(_=Depends(require_auth)):
-    import base64
     host = get_host()
     async with LINKS_LOCK:
+        allowed = [d for d in LINKS.values() if is_link_allowed(d)]
         lines = [
-            generate_vless_link(uid, host, remark=f"RVG-{d['label']}", protocol=d.get("protocol", DEFAULT_PROTOCOL))
+            generate_share_link(uid, host, remark=f"RVG-{d['label']}", protocol=d.get("protocol", DEFAULT_PROTOCOL))
             for uid, d in LINKS.items()
             if is_link_allowed(d)
         ]
+        total_used = sum(d.get("used_bytes", 0) for d in allowed)
+        total_limit = sum(d.get("limit_bytes", 0) for d in allowed)
+        expiries = [d["expires_at"] for d in allowed if d.get("expires_at")]
+    nearest_exp = min(expiries) if expiries else None
     content = base64.b64encode("\n".join(lines).encode()).decode()
-    return Response(content=content, media_type="text/plain")
+    headers = build_sub_headers("RVG-All", total_used, total_limit, nearest_exp)
+    return Response(content=content, media_type="text/plain", headers=headers)
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SUB GROUP endpoints
+# SUB GROUP endpoints (بدون تغییر)
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.post("/api/subs")
@@ -473,36 +718,31 @@ async def assign_link_to_sub(sub_id: str, request: Request, _=Depends(require_au
 # ── Public sub-group subscription file ───────────────────────────────────────
 @app.get("/sub-group/{uuid_key}")
 async def sub_group_subscription(uuid_key: str, request: Request):
-    import base64
     async with SUBS_LOCK:
         sub = next((s for s in SUBS.values() if s.get("uuid_key") == uuid_key), None)
     if not sub:
         raise HTTPException(status_code=404, detail="not found")
-
     if sub.get("password_hash"):
         pw = request.query_params.get("pw", "")
         if hash_password(pw) != sub["password_hash"]:
             raise HTTPException(status_code=403, detail="wrong password")
-
     host = get_host()
     link_ids = sub.get("link_ids", [])
     async with LINKS_LOCK:
         lines = []
+        allowed_links = []
         for lid in link_ids:
             link = LINKS.get(lid)
             if link and is_link_allowed(link):
-                lines.append(generate_vless_link(lid, host, remark=f"RVG-{link['label']}", protocol=link.get("protocol", DEFAULT_PROTOCOL)))
-
+                lines.append(generate_share_link(lid, host, remark=f"RVG-{link['label']}", protocol=link.get("protocol", DEFAULT_PROTOCOL)))
+                allowed_links.append(link)
+        total_used = sum(l.get("used_bytes", 0) for l in allowed_links)
+        total_limit = sum(l.get("limit_bytes", 0) for l in allowed_links)
+        expiries = [l["expires_at"] for l in allowed_links if l.get("expires_at")]
+    nearest_exp = min(expiries) if expiries else None
     content = base64.b64encode("\n".join(lines).encode()).decode()
-    return Response(
-        content=content,
-        media_type="text/plain",
-        headers={
-            "profile-title": quote(sub["name"]),
-            "support-url": "https://t.me/CodeBoxo",
-            "profile-update-interval": "12",
-        }
-    )
+    headers = build_sub_headers(sub["name"], total_used, total_limit, nearest_exp)
+    return Response(content=content, media_type="text/plain", headers=headers)
 
 # ── Auth endpoints ────────────────────────────────────────────────────────────
 @app.post("/api/login")
@@ -544,6 +784,79 @@ async def api_change_password(request: Request, token=Depends(require_auth)):
     await save_state()
     log_activity("auth", "رمز عبور پنل تغییر کرد", "ok")
     return {"ok": True}
+# ── Backup / Restore ──────────────────────────────────────────────────────────
+@app.get("/api/backup/export")
+async def backup_export(_=Depends(require_auth)):
+    async with LINKS_LOCK:
+        links_snap = dict(LINKS)
+    async with SUBS_LOCK:
+        subs_snap = dict(SUBS)
+    data = {
+        "kind": "rvg-backup",
+        "version": "9.2",
+        "exported_at": datetime.now().isoformat(),
+        "host": get_host(),
+        "links": links_snap,
+        "subs": subs_snap,
+        "password_hash": AUTH["password_hash"],
+    }
+    content = json.dumps(data, ensure_ascii=False, indent=2)
+    filename = f"rvg-backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
+    log_activity("system", "فایل بکاپ دانلود شد", "info")
+    return Response(
+        content=content,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.post("/api/backup/import")
+async def backup_import(request: Request, _=Depends(require_auth)):
+    body = await request.json()
+    data = body.get("data")
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="فایل بکاپ نامعتبر است")
+
+    new_links = data.get("links")
+    new_subs = data.get("subs")
+    new_pw_hash = data.get("password_hash")
+    keep_password = bool(body.get("keep_current_password", True))
+
+    if not isinstance(new_links, dict) or not isinstance(new_subs, dict):
+        raise HTTPException(status_code=400, detail="ساختار فایل بکاپ نامعتبر است")
+
+    # همه‌ی instance های فعلی MTProto رو متوقف کن قبل از جایگزینی
+    try:
+        await mtproto.stop_all()
+    except Exception as exc:
+        logger.warning(f"توقف MTProto قبل از ایمپورت ناموفق بود: {exc}")
+
+    async with LINKS_LOCK:
+        LINKS.clear()
+        LINKS.update(new_links)
+    async with SUBS_LOCK:
+        SUBS.clear()
+        SUBS.update(new_subs)
+
+    if not keep_password and new_pw_hash:
+        AUTH["password_hash"] = new_pw_hash
+        async with SESSIONS_LOCK:
+            SESSIONS.clear()
+            # سشن فعلی رو نگه می‌داریم که کاربر لاگ‌اوت نشه
+            token = request.cookies.get(SESSION_COOKIE)
+            if token:
+                SESSIONS[token] = time.time() + SESSION_TTL
+
+    await save_state()
+
+    try:
+        await _restart_mtproto_instances()
+    except Exception as exc:
+        logger.error(f"راه‌اندازی مجدد MTProto بعد از ایمپورت ناموفق بود: {exc}")
+
+    log_activity("system", "بکاپ با موفقیت روی پنل بازیابی شد", "ok")
+    return {"ok": True, "links_count": len(LINKS), "subs_count": len(SUBS)}
+    
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
 @app.get("/stats")
@@ -565,6 +878,65 @@ async def get_stats(_=Depends(require_auth)):
         "subs_count": len(SUBS),
     }
 
+@app.post("/api/bot-tcp-proxy/start")
+async def api_bot_tcp_proxy_start(request: Request, _=Depends(require_auth)):
+    body = await request.json()
+    token = str(body.get("token", "")).strip()
+    port = int(body.get("port") or CONFIG["port"])
+    mode = str(body.get("mode") or "blacklist")
+    target_domains = body.get("target_domains") or []
+    extra_blacklist_domains = body.get("extra_blacklist_domains") or []
+    try:
+        bottokentcpproxy.start_job(
+            token, port, mode=mode,
+            target_domains=target_domains,
+            extra_blacklist_domains=extra_blacklist_domains,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    log_activity(
+        "system",
+        "ساخت TCP Proxy" + (" (جستجوی دامنه‌ی دلخواه)" if mode == "whitelist" else " (بلک‌لیست)") + " آغاز شد",
+        "info",
+    )
+    return {"ok": True}
+
+@app.post("/api/bot-tcp-proxy/stop")
+async def api_bot_tcp_proxy_stop(_=Depends(require_auth)):
+    stopped = bottokentcpproxy.stop_job()
+    if stopped:
+        log_activity("system", "ساخت TCP Proxy ربات متوقف شد", "warn")
+    return {"ok": True, "stopped": stopped}
+
+@app.get("/api/bot-tcp-proxy/status")
+async def api_bot_tcp_proxy_status(_=Depends(require_auth)):
+    return bottokentcpproxy.get_status()
+
+
+@app.post("/api/domain-gen/start")
+async def api_domain_gen_start(request: Request, _=Depends(require_auth)):
+    body = await request.json()
+    token = str(body.get("token", "")).strip()
+    port = int(body.get("port") or CONFIG["port"])
+    count = int(body.get("count") or 10)
+    try:
+        botgeneratedomin.start_job(token, port, target_count=count)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    log_activity("system", f"ساخت {count} دامنه آغاز شد", "info")
+    return {"ok": True}
+
+@app.post("/api/domain-gen/stop")
+async def api_domain_gen_stop(_=Depends(require_auth)):
+    stopped = botgeneratedomin.stop_job()
+    if stopped:
+        log_activity("system", "ساخت دامنه متوقف شد", "warn")
+    return {"ok": True, "stopped": stopped}
+
+@app.get("/api/domain-gen/status")
+async def api_domain_gen_status(_=Depends(require_auth)):
+    return botgeneratedomin.get_status()
+
 # ── Activity Logs ─────────────────────────────────────────────────────────────
 @app.get("/api/activity")
 async def get_activity(_=Depends(require_auth)):
@@ -573,16 +945,8 @@ async def get_activity(_=Depends(require_auth)):
 # ── Live connections (with IP) ────────────────────────────────────────────────
 @app.get("/api/connections")
 async def get_connections(_=Depends(require_auth)):
-    """
-    خروجی این endpoint حالا بر اساس IP گروه‌بندی شده:
-    هر آی‌پی فقط یک آیتم نمایش داده می‌شود، با جمع بایت‌های تمام سشن‌های
-    باز روی همان آی‌پی و تعداد سشن‌های فعال آن آی‌پی.
-    raw_count همچنان تعداد واقعی اتصالات باز (سشن‌های خام، مثلاً ۴۰ تا
-    اتصال هم‌زمان یک موبایل) را برمی‌گرداند.
-    """
     async with LINKS_LOCK:
         snap = dict(LINKS)
-
     grouped: dict[str, dict] = {}
     for conn_id, c in connections.items():
         ip = c.get("ip", "نامشخص")
@@ -610,7 +974,22 @@ async def get_connections(_=Depends(require_auth)):
                 g["first_connected_at"] = ca
             if not g["last_connected_at"] or ca > g["last_connected_at"]:
                 g["last_connected_at"] = ca
-
+    for uid, link in snap.items():
+        if link.get("protocol") == "mtproto":
+            label = link.get("label", "نامشخص")
+            for c in mtproto.get_instance_connections(uid):
+                ip = c["ip"]
+                g = grouped.get(ip)
+                if g is None:
+                    g = {
+                        "ip": ip, "sessions": 0, "bytes": 0,
+                        "labels": set(), "transports": set(),
+                        "first_connected_at": None, "last_connected_at": None,
+                    }
+                    grouped[ip] = g
+                g["sessions"] += 1
+                g["labels"].add(label)
+                g["transports"].add("mtproto")
     result = []
     for ip, g in grouped.items():
         result.append({
@@ -625,11 +1004,10 @@ async def get_connections(_=Depends(require_auth)):
             "last_connected_at": g["last_connected_at"],
         })
     result.sort(key=lambda x: x.get("last_connected_at") or "", reverse=True)
-
     return {
         "connections": result,
-        "count": len(result),          # تعداد آی‌پی‌های یکتا
-        "raw_count": len(connections), # تعداد کل اتصالات باز (بدون گروه‌بندی)
+        "count": len(result),
+        "raw_count": len(connections),
     }
 
 # ── Link Management ───────────────────────────────────────────────────────────
@@ -648,20 +1026,67 @@ async def create_link(request: Request, _=Depends(require_auth)):
     if protocol not in PROTOCOLS:
         protocol = DEFAULT_PROTOCOL
 
+    alpn_val = str(body.get("alpn") or "h2,http/1.1").strip()[:60]
+    fp_val = str(body.get("fingerprint") or "chrome").strip()[:20]
+    if fp_val not in ("chrome", "firefox", "ios"):
+        fp_val = "chrome"
+
     uid = generate_uuid()
+    link_data = {
+        "label": label,
+        "limit_bytes": limit_bytes,
+        "used_bytes": 0,
+        "created_at": datetime.now().isoformat(),
+        "alpn": alpn_val,
+        "fingerprint": fp_val,
+        "active": True,
+        "expires_at": expires_at,
+        "note": note,
+        "is_default": False,
+        "sub_id": sub_id,
+        "protocol": protocol,
+        "ad_tag": None,
+    }
+
+    if protocol == "mtproto":
+        raw_port = body.get("mtproto_port")
+        manual_port = int(raw_port) if raw_port not in (None, "", 0, "0") else None
+        if manual_port is not None and not (1 <= manual_port <= 65535):
+            raise HTTPException(status_code=400, detail="شماره پورت نامعتبر است")
+        raw_domain = (body.get("mtproto_domain") or "").strip()
+        domain = raw_domain if raw_domain else mtproto.DEFAULT_FAKE_TLS_DOMAIN
+        try:
+            inst = await mtproto.start_instance(
+                uid,
+                domain=domain,
+                preferred_port=manual_port,
+                force_port=manual_port is not None,
+                ad_tag=None,
+            )
+        except RuntimeError as exc:
+            logger.error(f"راه‌اندازی MTProto ناموفق برای {uid[:8]}: {exc}")
+            raise HTTPException(status_code=409, detail=str(exc))
+        except Exception as exc:
+            logger.error(f"راه‌اندازی MTProto ناموفق برای {uid[:8]}: {exc}")
+            raise HTTPException(status_code=502, detail=f"راه‌اندازی MTProto ناموفق: {exc}")
+        link_data["mtproto_port"] = inst["port"]
+        link_data["mtproto_secret"] = inst["secret"]
+        link_data["mtproto_domain"] = inst["domain"]
+        link_data["mtproto_manual_port"] = manual_port is not None
+        if manual_port is None and bottokentcpproxy.has_saved_token():
+            link_data["mtproto_public_pending"] = True
+            asyncio.create_task(_attach_mtproto_public_proxy(uid, inst["port"], label))
+
+
+    if protocol == "shadowsocks" or protocol.startswith("shadowsocks-xhttp-"):
+        ss_cipher = body.get("ss_cipher") or DEFAULT_CIPHER
+        if ss_cipher not in CIPHERS:
+            ss_cipher = DEFAULT_CIPHER
+        link_data["ss_cipher"] = ss_cipher
+        link_data["ss_password"] = secrets.token_urlsafe(16)
+    
     async with LINKS_LOCK:
-        LINKS[uid] = {
-            "label": label,
-            "limit_bytes": limit_bytes,
-            "used_bytes": 0,
-            "created_at": datetime.now().isoformat(),
-            "active": True,
-            "expires_at": expires_at,
-            "note": note,
-            "is_default": False,
-            "sub_id": sub_id,
-            "protocol": protocol,
-        }
+        LINKS[uid] = link_data
 
     if sub_id:
         async with SUBS_LOCK:
@@ -677,7 +1102,7 @@ async def create_link(request: Request, _=Depends(require_auth)):
         "uuid": uid,
         **LINKS[uid],
         "expired": False,
-        "vless_link": generate_vless_link(uid, host, remark=f"RVG-{label}", protocol=protocol),
+        "vless_link": generate_share_link(uid, host, remark=f"RVG-{label}", protocol=protocol),
         "sub_url": f"https://{host}/sub/{uid}",
     }
 
@@ -694,7 +1119,7 @@ async def list_links(_=Depends(require_auth)):
             **d,
             "protocol": proto,
             "expired": is_link_expired(d),
-            "vless_link": generate_vless_link(uid, host, remark=f"RVG-{d['label']}", protocol=proto),
+            "vless_link": generate_share_link(uid, host, remark=f"RVG-{d['label']}", protocol=proto),
             "sub_url": f"https://{host}/sub/{uid}",
         })
     result.sort(key=lambda x: x["created_at"], reverse=True)
@@ -703,15 +1128,24 @@ async def list_links(_=Depends(require_auth)):
 @app.patch("/api/links/{uid}")
 async def update_link(uid: str, request: Request, _=Depends(require_auth)):
     body = await request.json()
+    mtproto_action = None
+    new_sub = "UNCHANGED"
+
     async with LINKS_LOCK:
         if uid not in LINKS:
             raise HTTPException(status_code=404, detail="link not found")
         link = LINKS[uid]
         old_sub = link.get("sub_id")
         label = link.get("label")
+
         if "active" in body:
-            link["active"] = bool(body["active"])
-            log_activity("link", f"کانفیگ «{label}» {'فعال' if link['active'] else 'غیرفعال'} شد", "ok" if link["active"] else "warn")
+            new_active = bool(body["active"])
+            changed = new_active != link.get("active", True)
+            link["active"] = new_active
+            log_activity("link", f"کانفیگ «{label}» {'فعال' if new_active else 'غیرفعال'} شد", "ok" if new_active else "warn")
+            if changed and link.get("protocol") == "mtproto":
+                mtproto_action = ("start" if new_active else "stop", dict(link))
+
         if "label" in body:
             link["label"] = str(body["label"])[:60]
         if "note" in body:
@@ -726,7 +1160,14 @@ async def update_link(uid: str, request: Request, _=Depends(require_auth)):
         if "expires_days" in body:
             ed = int(body["expires_days"] or 0)
             link["expires_at"] = (datetime.now() + timedelta(days=ed)).isoformat() if ed > 0 else None
-        if any(k in body for k in ("label", "note", "limit_value", "expires_days")):
+        if "alpn" in body:
+            alpn_val = str(body["alpn"]).strip()[:60]
+            if alpn_val:
+                link["alpn"] = alpn_val
+        if "fingerprint" in body:
+            fp_val = str(body["fingerprint"]).strip()
+            link["fingerprint"] = fp_val if fp_val in ("chrome", "firefox", "ios") else "chrome"
+        if any(k in body for k in ("label", "note", "limit_value", "expires_days", "alpn", "fingerprint")):
             log_activity("link", f"کانفیگ «{link['label']}» ویرایش شد", "info")
         new_sub = body.get("sub_id", "UNCHANGED")
         if new_sub != "UNCHANGED":
@@ -743,8 +1184,75 @@ async def update_link(uid: str, request: Request, _=Depends(require_auth)):
                 if uid not in ids:
                     ids.append(uid)
 
+    if mtproto_action:
+        action, snap = mtproto_action
+        if action == "stop":
+            await mtproto.stop_instance(uid)
+        else:
+            try:
+                old_port = snap.get("mtproto_port")
+                inst = await mtproto.start_instance(
+                    uid,
+                    secret=snap.get("mtproto_secret"),
+                    domain=snap.get("mtproto_domain", mtproto.DEFAULT_FAKE_TLS_DOMAIN),
+                    preferred_port=snap.get("mtproto_port"),
+                    force_port=snap.get("mtproto_manual_port", False),
+                    ad_tag=snap.get("ad_tag"),
+                )
+                async with LINKS_LOCK:
+                    if uid in LINKS:
+                        LINKS[uid]["mtproto_port"] = inst["port"]
+                        LINKS[uid]["mtproto_secret"] = inst["secret"]
+                if (snap.get("mtproto_proxy_id") and inst["port"] != old_port
+                        and not snap.get("mtproto_manual_port", False)):
+                    asyncio.create_task(_reattach_mtproto_public_proxy(
+                        uid, inst["port"], snap.get("mtproto_proxy_id"), snap.get("label", "")
+                    ))
+            except Exception as exc:
+                logger.error(f"روشن کردن MTProto ناموفق برای {uid[:8]}: {exc}")
+                async with LINKS_LOCK:
+                    if uid in LINKS:
+                        LINKS[uid]["active"] = False
+                log_activity("link", f"روشن کردن پروکسی تلگرام «{label}» ناموفق بود", "err")
+                asyncio.create_task(save_state())
+                raise HTTPException(status_code=502, detail=f"روشن کردن پروکسی تلگرام ناموفق بود: {exc}")
+
     asyncio.create_task(save_state())
     return {"ok": True}
+    
+# ===== Endpoint جدید برای به‌روزرسانی ad_tag =====
+@app.patch("/api/links/{uid}/ad-tag")
+async def update_ad_tag(uid: str, request: Request, _=Depends(require_auth)):
+    body = await request.json()
+    ad_tag = str(body.get("ad_tag", "")).strip()
+    if not ad_tag:
+        raise HTTPException(status_code=400, detail="ad_tag نمی‌تواند خالی باشد")
+
+    async with LINKS_LOCK:
+        if uid not in LINKS:
+            raise HTTPException(status_code=404, detail="link not found")
+        link = LINKS[uid]
+        if link.get("protocol") != "mtproto":
+            raise HTTPException(status_code=400, detail="این کانفیگ MTProto نیست")
+        link["ad_tag_status"] = "pending"   # ← جدید
+
+    asyncio.create_task(_update_mtproto_ad_tag(uid, ad_tag))
+    log_activity("link", f"درخواست به‌روزرسانی ad_tag برای «{link.get('label','')}» ثبت شد", "info")
+    return {"ok": True, "message": "ad_tag در حال اعمال است، پروکسی ری‌استارت می‌شود"}
+
+
+# اندپوینت جدید برای پول کردن وضعیت
+@app.get("/api/links/{uid}/ad-tag/status")
+async def get_ad_tag_status(uid: str, _=Depends(require_auth)):
+    async with LINKS_LOCK:
+        link = LINKS.get(uid)
+        if not link:
+            raise HTTPException(status_code=404, detail="link not found")
+        return {
+            "status": link.get("ad_tag_status", "idle"),
+            "link": link.get("ad_tag_link"),
+            "ad_tag": link.get("ad_tag"),
+        }
 
 @app.delete("/api/links/{uid}")
 async def delete_link(uid: str, _=Depends(require_auth)):
@@ -753,7 +1261,13 @@ async def delete_link(uid: str, _=Depends(require_auth)):
             raise HTTPException(status_code=404, detail="link not found")
         label = LINKS[uid].get("label", uid)
         sub_id = LINKS[uid].get("sub_id")
+        proto = LINKS[uid].get("protocol")
+        proxy_id = LINKS[uid].get("mtproto_proxy_id")
         del LINKS[uid]
+    if proto == "mtproto":
+        await mtproto.stop_instance(uid)
+        if proxy_id:
+            asyncio.create_task(bottokentcpproxy.delete_public_proxy(proxy_id))
     if sub_id:
         async with SUBS_LOCK:
             if sub_id in SUBS:
@@ -765,25 +1279,52 @@ async def delete_link(uid: str, _=Depends(require_auth)):
     return {"ok": True, "deleted": uid}
 
 # ══════════════════════════════════════════════════════════════════════════════
-# VLESS Relay — جدا شده به relay_vless.py (دست نخورده)
+# VLESS Relay
 # ══════════════════════════════════════════════════════════════════════════════
-
-from relay_vless import (
+from protocol.vless.vless import (
     RELAY_BUF,
     parse_vless_header,
     check_and_use,
     relay_ws_to_tcp,
     relay_tcp_to_ws,
-    websocket_tunnel,
 )
+from protocol.vless.websocket import websocket_tunnel
+
+from protocol.trojan.websocket import trojan_ws_tunnel
 
 app.add_api_websocket_route("/ws/{uuid}", websocket_tunnel)
+app.add_api_websocket_route("/trojan-ws", trojan_ws_tunnel)
+from protocol.shadowsocks.shadowsocks import generate_ss_link, generate_ss_xhttp_link, derive_key, CIPHERS, DEFAULT_CIPHER
+from protocol.shadowsocks.websocket import shadowsocks_ws_tunnel
+app.add_api_websocket_route("/ss-ws", shadowsocks_ws_tunnel)
 
 # ══════════════════════════════════════════════════════════════════════════════
-# XHTTP — Siz10a XHTTP Ultra (ترابرد جدید، جدا از VLESS/WS، هر ۳ مد)
+# XHTTP
 # ══════════════════════════════════════════════════════════════════════════════
-from xhttp_siz10 import router as xhttp_router
-app.include_router(xhttp_router)
+from protocol.vless.xhttpstreamon import router as xhttp_downlink_router
+from protocol.vless.xhttpstreamup import router as xhttp_streamup_router
+from protocol.vless.xhttshadpacketup import router as xhttp_packetup_router
+from protocol.vless.xhttpstreamone import router as xhttp_streamone_router
+app.include_router(xhttp_downlink_router)
+app.include_router(xhttp_streamup_router)
+app.include_router(xhttp_packetup_router)
+app.include_router(xhttp_streamone_router)
+
+from protocol.trojan.xhttpstreamon import router as trojan_xhttp_downlink_router
+from protocol.trojan.xhttpstreamup import router as trojan_xhttp_streamup_router
+from protocol.trojan.xhttshadpacketup import router as trojan_xhttp_packetup_router
+from protocol.trojan.xhttpstreamone import router as trojan_xhttp_streamone_router
+app.include_router(trojan_xhttp_downlink_router)
+app.include_router(trojan_xhttp_streamup_router)
+app.include_router(trojan_xhttp_packetup_router)
+app.include_router(trojan_xhttp_streamone_router)
+
+from protocol.shadowsocks.xhttshadstron import router as ss_xhttp_downlink_router
+from protocol.shadowsocks.xhttshadpacketup import router as ss_xhttp_packetup_router
+from protocol.shadowsocks.xhttshadstrup import router as ss_xhttp_streamup_router
+app.include_router(ss_xhttp_downlink_router)
+app.include_router(ss_xhttp_packetup_router)
+app.include_router(ss_xhttp_streamup_router)
 
 # ── HTTP Proxy ────────────────────────────────────────────────────────────────
 _HOP = {"connection","keep-alive","proxy-authenticate","proxy-authorization",
@@ -817,8 +1358,11 @@ async def public_sub_page(uuid_key: str, request: Request):
         return HTMLResponse("<h2 style='font-family:sans-serif;padding:40px'>گروه پیدا نشد</h2>", status_code=404)
     return HTMLResponse(content=get_public_page_html(uuid_key))
 
+
+
 @app.get("/api/public/sub/{uuid_key}")
 async def public_sub_data(uuid_key: str, request: Request):
+    # ۱. احراز هویت و دریافت داده‌ها (همان منطق قبلی شما)
     async with SUBS_LOCK:
         sub_entry = next(((sid, s) for sid, s in SUBS.items() if s.get("uuid_key") == uuid_key), None)
     if not sub_entry:
@@ -838,10 +1382,11 @@ async def public_sub_data(uuid_key: str, request: Request):
 
     links_out = []
     active_conns = 0
+    
+    # ۲. ساخت لیست کانفیگ‌ها
     for lid in link_ids:
         link = snap.get(lid)
-        if not link:
-            continue
+        if not link: continue
         allowed = is_link_allowed(link)
         conn_count = sum(1 for c in connections.values() if c.get("uuid") == lid)
         active_conns += conn_count
@@ -852,24 +1397,28 @@ async def public_sub_data(uuid_key: str, request: Request):
             "active": allowed,
             "protocol": proto,
             "used_bytes": link.get("used_bytes", 0),
-            "used_fmt": fmt_bytes(link.get("used_bytes", 0)),
             "limit_bytes": link.get("limit_bytes", 0),
-            "limit_fmt": "∞" if link.get("limit_bytes", 0) == 0 else fmt_bytes(link["limit_bytes"]),
-            "expires_at": link.get("expires_at"),
-            "vless_link": generate_vless_link(lid, host, remark=f"RVG-{link['label']}", protocol=proto),
-            "sub_url": f"https://{host}/sub/{lid}",
-            "connections": conn_count,
+            "vless_link": generate_share_link(lid, host, remark=f"RVG-{link['label']}", protocol=proto),
         })
 
-    total_used = sum(l["used_bytes"] for l in links_out)
+    # ۳. تشخیص کلاینت یا مرورگر
+    user_agent = request.headers.get("User-Agent", "").lower()
+    is_client = any(ua in user_agent for ua in ["v2rayng", "v2rayn", "shadowrocket", "clash", "surfboard", "nekoray"])
+
+    if is_client:
+        # اگر کلاینت است: فقط لینک‌های فعال را به صورت Base64 برگردان
+        raw_links = "\n".join([l["vless_link"] for l in links_out if l["active"]])
+        encoded_data = base64.b64encode(raw_links.encode("utf-8")).decode("utf-8")
+        return Response(content=encoded_data, media_type="text/plain")
+
+    # ۴. اگر مرورگر است: دیتای کامل JSON را برگردان
     return {
         "locked": False,
         "name": sub["name"],
         "desc": sub.get("desc", ""),
         "sub_url": f"https://{host}/sub-group/{uuid_key}",
         "active_connections": active_conns,
-        "total_used_fmt": fmt_bytes(total_used),
-        "links": links_out,
+        "links": links_out, # اینجا همان لیست کامل شماست
     }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -908,7 +1457,6 @@ async def api_update_log(_=Depends(require_auth)):
 async def api_update(_=Depends(require_auth)):
     if update_state["running"]:
         raise HTTPException(status_code=409, detail="بروزرسانی در حال اجراست")
-
     update_log.append({"time": time.time(), "msg": "درخواست بروزرسانی ثبت شد، در صف اجرا..."})
 
     async def _run():
@@ -925,14 +1473,10 @@ async def api_update(_=Depends(require_auth)):
             log_activity("system", "بروزرسانی پنل " + ("موفق" if ok else "ناموفق") + " بود", "ok" if ok else "err")
         except Exception:
             pass
-
         if ok:
             update_log.append({"time": time.time(), "msg": "در حال راه‌اندازی مجدد پروسه (بدون خاموش‌شدن کانتینر)..."})
             await asyncio.sleep(1.5)
             try:
-                # پروسه رو با همون PID دوباره از صفر اجرا می‌کنه؛
-                # برخلاف os._exit، کانتینر رو نمی‌کشه و نیازی به
-                # ری‌استارت خارجی (Railway) نداره.
                 os.execv(sys.executable, [sys.executable] + sys.argv)
             except Exception as exc:
                 update_log.append({"time": time.time(), "msg": f"❌ execv شکست خورد: {exc} — fallback به exit"})
@@ -952,7 +1496,7 @@ async def api_update(_=Depends(require_auth)):
     log_activity("system", "درخواست بروزرسانی پنل ثبت شد", "info")
     return {"ok": True, "started": True}
 
-# ── HTML Pages (login + dashboard) ───────────────────────────────────────────
+# ── HTML Pages ───────────────────────────────────────────────────────────────
 from pages import LOGIN_HTML, DASHBOARD_HTML
 
 # ── Central: Announcements & Support ─────────────────────────────────────────
@@ -987,7 +1531,6 @@ async def api_support_send(request: Request, _=Depends(require_auth)):
         raise HTTPException(status_code=502, detail=result.get("error") or "ارتباط با سرور مرکزی برقرار نشد")
     return {"ok": True}
 
-
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     if await is_valid_session(request.cookies.get(SESSION_COOKIE)):
@@ -1006,4 +1549,12 @@ async def test_ws_redirect():
     return HTMLResponse(content="<script>location.href='/dashboard'</script>")
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=CONFIG["port"], log_level="info", workers=1)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=CONFIG["port"],
+        log_level="info",
+        workers=1,
+        loop="auto",         # uvloop رو در صورت نصب بودن استفاده می‌کنه، وگرنه بدون کرش fallback می‌کنه
+        http="auto",
+    )
