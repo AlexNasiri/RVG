@@ -55,12 +55,9 @@ RVG/
 - **cryptography** برای عملیات رمزنگاری پروتکل‌ها
 - **aiofiles** برای I/O غیرمسدودکننده روی دیسک
 
-## ⚡ اجرا
 
-```bash
-pip install -r requirements.txt
-python main.py
-```
+
+
 
 پیکربندی از طریق متغیرهای محیطی (`DATA_DIR`, `SECRET_KEY`, `CENTRAL_URL`, `UPDATE_MANIFEST_URL` و ...) قابل تنظیم است.
 
