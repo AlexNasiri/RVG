@@ -453,7 +453,7 @@ def now_ir() -> datetime:
 
 def generate_share_link(uuid: str, host: str, remark: str = "RVG", protocol: str = DEFAULT_PROTOCOL) -> str:
     link = LINKS.get(uuid) or {}
-    alpn = link.get("alpn", "h2,http/1.1")
+    alpn = link.get("alpn", "h2")
     fp = link.get("fingerprint", "chrome")
 
     if protocol == "mtproto":
