@@ -52,6 +52,8 @@ def _tune_socket(writer: asyncio.StreamWriter):
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, SOCK_BUF)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, SOCK_BUF)
+        if hasattr(socket, "TCP_QUICKACK"):
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_QUICKACK, 1)
     except Exception as e:
         logger.warning(f"VLESS _tune_socket failed: {e}")
 

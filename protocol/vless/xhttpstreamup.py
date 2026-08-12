@@ -1,17 +1,20 @@
 # xhttpstreamup.py
 # ══════════════════════════════════════════════════════════════════════════════
-# XHTTP — آپلینک stream-up (POST(های) پیوسته روی یک session) برای VLESS / Trojan
+# XHTTP — آپلینک stream-up (یک POST پیوسته روی یک session) برای VLESS
 # منطق اصلی (session, quota, adaptive flow) در xhttp_core.py قرار دارد.
+# دقیقاً هم‌راستا با نسخه‌ی مرجع: بدون لاک روی هر chunk. اون لاک باعث می‌شد اگر
+# rotation دو POST هم‌پوشان بفرسته، ترتیب بایت‌های نوشته‌شده روی TCP به‌هم بریزه
+# (چون stream-up بر خلاف packet-up هیچ seq نداره) و همین باعث افت شدید سرعت
+# (خرابی داده → قطع/ری‌ترای در لایه‌ی برنامه) می‌شد. اینجا هر session فقط با یک
+# POST فعال در آنِ واحد نوشته می‌شه، دقیقاً مثل کد مرجع.
 # ══════════════════════════════════════════════════════════════════════════════
 
 import time
-import traceback
 from datetime import datetime
 
 from fastapi import APIRouter, Request, HTTPException
-from starlette.requests import ClientDisconnect
 
-from main import stats, connections, error_logs, logger
+from main import stats, connections, error_logs
 from protocol.vless.xhttp_core import (
     _AdaptiveFlow,
     _QuotaGate,
@@ -25,11 +28,7 @@ from protocol.vless.xhttp_core import (
 router = APIRouter()
 
 
-# ══════════════════════════════ STREAM-UP (POST(های) پیوسته روی یک session) ══════════════════════════════
-# نکته‌ی مهم: پروتکل XHTTP اجازه می‌ده کلاینت برای یک session چند POST جداگانه و
-# پشت‌سرهم بفرسته (rotation). وقتی کلاینت یک POST رو می‌بنده، این یک قطع طبیعیِ
-# «این درخواست» است، نه قطع کل تونل — پس فقط از این تابع خارج می‌شیم، بدون اینکه
-# TCP/session رو تخریب کنیم؛ POST بعدی با همون session_id ادامه می‌ده.
+# ══════════════════════════════ STREAM-UP (یک POST پیوسته) ══════════════════════════════
 @router.post("/xhttp-siz10/stream-up/{uuid}/{session_id}")
 async def stream_up_upload(uuid: str, session_id: str, request: Request):
     ensure_reaper()
@@ -47,74 +46,40 @@ async def stream_up_upload(uuid: str, session_id: str, request: Request):
         flow = _AdaptiveFlow()
         sess["flow"] = flow
 
-    upload_lock = sess["upload_lock"]
-    conn = connections.get(sess["conn_id"])
-    if conn is None:
-        # session بین این چک و الان بسته شده
-        raise HTTPException(status_code=404, detail="session closed")
+    conn = connections[sess["conn_id"]]   # یک بار لوک‌آپ، نه هر چانک
+    writer = sess["writer"]               # ممکنه هنوز None باشه
 
-    async with upload_lock:  # جلوگیری از نوشتن هم‌زمان دو POST روی یک writer
-        writer = sess["writer"]  # ممکنه هنوز None باشه
+    try:
+        async for chunk in request.stream():
+            if not chunk:
+                continue
+            sess["last_seen"] = time.time()
 
-        try:
-            async for chunk in request.stream():
-                if not chunk:
-                    continue
-                sess["last_seen"] = time.time()
+            if not await gate.add(len(chunk)):
+                raise HTTPException(status_code=403, detail="quota/disabled/unknown")
 
-                if not await gate.add(len(chunk)):
-                    logger.warning(f"XHTTP[stream-up] [{session_id[:8]}] quota exceeded during upload")
-                    raise HTTPException(status_code=403, detail="quota/disabled/unknown")
+            stats["total_requests"] += 1
+            conn["bytes"] += len(chunk)
 
-                stats["total_requests"] += 1
-                conn["bytes"] += len(chunk)
+            if writer is None:
+                await _open_tcp_for_session(session_id, uuid, sess, chunk)
+                writer = sess["writer"]
+                continue
 
-                if writer is None:
-                    await _open_tcp_for_session(session_id, uuid, sess, chunk)
-                    writer = sess["writer"]
-                    continue
-
-                if writer.is_closing():
-                    raise ConnectionError("transport closing (remote already closed)")
-                writer.write(chunk)
-                if flow.should_drain(writer.transport.get_write_buffer_size()):
-                    await flow.drain(writer)
-
-        except ClientDisconnect:
-            # در stream-up، کلاینت uplink رو می‌بنده تا downlink ادامه بده.
-            # TCP را نمی‌کشیم — writer رو flush می‌کنیم تا داده‌های pending به remote برسه،
-            # ولی session/TCP زنده می‌مونه تا downlink بتونه ادامه بده.
-            await gate.flush()
-            if sess.get("writer") and not sess["writer"].is_closing():
-                try:
-                    await sess["writer"].drain()
-                except Exception:
-                    pass
-            logger.info(f"XHTTP[stream-up] [{session_id[:8]}] uplink closed by client, downlink still active")
-            return
-
-        except HTTPException as exc:
-            logger.warning(f"XHTTP[stream-up] [{session_id[:8]}] HTTPException: {exc.status_code} {exc.detail}")
-            await gate.flush()
-            await _teardown(session_id, reason=f"http-{exc.status_code}")
-            raise
-
-        except (ConnectionResetError, BrokenPipeError, ConnectionError) as exc:
-            # اینجا مشکل واقعاً TCP سمت مقصد (یا writer) هست، نه رفتار عادی کلاینت
-            # پس باید کل session رو ببندیم چون دیگه قابل ادامه نیست.
-            logger.warning(f"XHTTP[stream-up] [{session_id[:8]}] connection error: {type(exc).__name__}: {exc}")
-            error_logs.append({"error": f"stream-up conn error: {type(exc).__name__}: {exc}", "time": datetime.now().isoformat()})
-            await gate.flush()
-            await _teardown(session_id, reason=f"conn-error: {type(exc).__name__}")
-            raise HTTPException(status_code=502, detail="stream error")
-
-        except Exception as exc:
-            tb = traceback.format_exc()
-            logger.error(f"XHTTP[stream-up] [{session_id[:8]}] stream CRASHED: {type(exc).__name__}: {exc}\n{tb}")
-            error_logs.append({"error": f"stream-up crash: {type(exc).__name__}: {exc}", "time": datetime.now().isoformat()})
-            await gate.flush()
-            await _teardown(session_id, reason=f"crash: {type(exc).__name__}")
-            raise HTTPException(status_code=502, detail="stream error")
-
+            if writer.is_closing():
+                raise ConnectionError("transport closing")
+            writer.write(chunk)
+            if flow.should_drain(writer.transport.get_write_buffer_size()):
+                await flow.drain(writer)
+    except HTTPException:
         await gate.flush()
-        return {"ok": True}
+        await _teardown(session_id, reason="quota/http")
+        raise
+    except Exception as exc:
+        error_logs.append({"error": str(exc), "time": datetime.now().isoformat()})
+        await gate.flush()
+        await _teardown(session_id, reason=f"stream-error: {type(exc).__name__}")
+        raise HTTPException(status_code=502, detail="stream error")
+
+    await gate.flush()
+    return {"ok": True}

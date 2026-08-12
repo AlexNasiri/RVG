@@ -13,7 +13,7 @@ import secrets
 import socket
 import time
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 from protocol.trojan.trojan import parse_trojan_header, find_uuid_by_trojan_hash
 
 from fastapi import Request, HTTPException
@@ -42,7 +42,7 @@ REAPER_INTERVAL = 10
 TCP_CONNECT_TIMEOUT = 10.0
 
 # ── تنظیمات موتور تطبیقی ──────────────────────────────────────────────────────
-SOCK_BUF_SIZE = 4 * 1024 * 1024     # افزایش از 2MB به 4MB برای throughput بالاتر
+SOCK_BUF_SIZE = 2 * 1024 * 1024     # افزایش از 2MB به 4MB برای throughput بالاتر
 
 # _AdaptiveFlow: بازه‌ی مجاز برای high-water تطبیقی (AIMD)
 FLOW_MIN_HW = 256 * 1024
@@ -91,6 +91,8 @@ def _tune_socket(writer: asyncio.StreamWriter):
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, SOCK_BUF_SIZE)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, SOCK_BUF_SIZE)
+        if hasattr(socket, "TCP_QUICKACK"):
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_QUICKACK, 1)
     except OSError as e:
         logger.warning(f"XHTTP _tune_socket failed: {e}")
 
@@ -223,7 +225,7 @@ async def _get_or_create_session(uuid: str, mode: str, session_id: str, ip: str 
         connections[conn_id] = {
             "uuid": uuid,
             "ip": ip,
-            "connected_at": datetime.now().isoformat(),
+            "connected_at": datetime.now(timezone.utc).isoformat(),
             "bytes": 0,
             "transport": f"xhttp-{mode}",
         }
@@ -236,7 +238,6 @@ async def _get_or_create_session(uuid: str, mode: str, session_id: str, ip: str 
             "seq_buf": {}, "next_seq": 0,
             "gate": None,  # لازی ساخته می‌شه: _QuotaGate تطبیقی مخصوص stream-up
             "flow": None,  # لازی ساخته می‌شه: _AdaptiveFlow مخصوص stream-up
-            "upload_lock": asyncio.Lock(),  # جلوگیری از رقابت دو POST هم‌زمان روی یک session
         }
         xhttp_sessions[session_id] = sess
         logger.info(f"new XHTTP[{mode}] session [{session_id[:8]}] uuid={uuid[:8]} ip={ip}")

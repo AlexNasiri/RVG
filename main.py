@@ -1,3 +1,30 @@
+import subprocess
+import sys
+
+_PACKAGES = [
+    "fastapi==0.104.1",
+    "uvicorn[standard]==0.24.0",
+    "uvloop>=0.19.0",
+    "httptools>=0.6.0",
+    "httpx[http2]==0.25.1",
+    "websockets==12.0",
+    "aiofiles>=23.2.1",
+    "cryptography>=39.0.0",
+]
+
+def _install_packages():
+    try:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "--quiet", "--disable-pip-version-check", *_PACKAGES],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"[STARTUP] خطا در نصب پکیج‌ها:\n{e.stderr.decode()}", file=sys.stderr)
+        sys.exit(1)
+
+# _install_packages()  # deps preinstalled for local test
+
 import asyncio
 import json
 import os
@@ -31,6 +58,14 @@ logger = logging.getLogger("RVG-Gateway")
 IRAN_TZ = ZoneInfo("Asia/Tehran")
 
 app = FastAPI(title="RVG Gateway - codebox", docs_url=None, redoc_url=None)
+
+# وقتی مستقیم با `python main.py` اجرا میشه، این ماژول با نام "__main__" ثبت
+# میشه نه "main". چون protocol/vless/vless.py و protocol/trojan/trojan.py با
+# `from main import (...)` به این فایل رفرنس می‌دن، بدون این خط پایتون مجبور
+# میشه کل main.py رو یک‌بار دیگه از صفر به‌عنوان ماژول جداگانه‌ی "main" اجرا کنه
+# که باعث circular import و کرش میشه. با alias کردن sys.modules، هر دو اسم
+# به همین نمونه‌ی در حال اجرا اشاره می‌کنن.
+sys.modules.setdefault("main", sys.modules[__name__])
 
 app.add_middleware(
     CORSMiddleware,
@@ -83,9 +118,15 @@ async def load_state():
             data = json.loads(raw)
             LINKS.update(data.get("links", {}))
             SUBS.update(data.get("subs", {}))
+            NODE_KEYS.update(data.get("node_keys", {}))
+            for nid, n in (data.get("nodes") or {}).items():
+                NODES[nid] = _normalize_node(n)
             if "password_hash" in data:
                 AUTH["password_hash"] = data["password_hash"]
-            logger.info(f"State loaded: {len(LINKS)} links, {len(SUBS)} subs")
+            logger.info(
+                f"State loaded: {len(LINKS)} links, {len(SUBS)} subs, "
+                f"{len(NODES)} nodes, {len(NODE_KEYS)} node keys"
+            )
     except Exception as e:
         logger.warning(f"Could not load state: {e}")
 
@@ -96,6 +137,8 @@ async def save_state():
             data = {
                 "links": dict(LINKS),
                 "subs": dict(SUBS),
+                "node_keys": dict(NODE_KEYS),
+                "nodes": dict(NODES),
                 "password_hash": AUTH["password_hash"],
                 "saved_at": datetime.now().isoformat(),
             }
@@ -153,10 +196,24 @@ LINKS_LOCK = asyncio.Lock()
 SUBS: dict = {}
 SUBS_LOCK = asyncio.Lock()
 
+# ── Node linking (اتصال چند پنل به هم) ────────────────────────────────────────
+# NODE_KEYS: کلیدهایی که *این* پنل صادر کرده. هر کلید به یک پنل دیگه اجازه میده
+#            دیتای این پنل رو بخونه و روی کانفیگ‌هاش بنویسه (سمت inbound).
+# NODES:     پنل‌هایی که *این* پنل بهشون وصل شده و دیتاشون رو ادغام می‌کنه (سمت outbound).
+NODE_KEYS: dict = {}
+NODE_KEYS_LOCK = asyncio.Lock()
+NODES: dict = {}
+NODES_LOCK = asyncio.Lock()
+_NODE_CACHE: dict = {}          # node_id -> {"at": float, "data": dict}
+NODE_CACHE_TTL = 8.0
+NODE_KEY_PREFIX = "rvg-"
+NODE_KEY_HEADER = "X-RVG-Node-Key"
+NODE_SHARE_PARTS = ("usage", "links", "subs", "requests", "logs")
+
 PROTOCOLS = (
-    "vless-ws", "xhttp-packet-up", "xhttp-stream-up", "xhttp-stream-one",
-    "trojan-ws", "trojan-xhttp-packet-up", "trojan-xhttp-stream-up", "trojan-xhttp-stream-one",
-    "mtproto", "shadowsocks", "shadowsocks-xhttp-packet-up", "shadowsocks-xhttp-stream-up",
+    "vless-ws", "xhttp-packet-up", "xhttp-stream-up",
+    "trojan-ws", "trojan-xhttp-packet-up", "trojan-xhttp-stream-up",
+    "mtproto", "shadowsocks",
 )
 DEFAULT_PROTOCOL = "vless-ws"
 
@@ -415,12 +472,6 @@ def generate_share_link(uuid: str, host: str, remark: str = "RVG", protocol: str
         password = link.get("ss_password", "")
         return generate_ss_link(host, 443, cipher, password, remark)
 
-    if protocol.startswith("shadowsocks-xhttp-"):
-        mode = protocol.replace("shadowsocks-xhttp-", "")
-        cipher = link.get("ss_cipher", DEFAULT_CIPHER)
-        password = link.get("ss_password", "")
-        return generate_ss_xhttp_link(uuid, host, 443, cipher, password, remark, mode)
-
     if protocol == "trojan-ws":
         params = {
             "security": "tls", "type": "ws", "host": host,
@@ -533,6 +584,110 @@ def client_ip(request: Request) -> str:
         return real_ip.strip()
     return request.client.host if request.client else "نامشخص"
 
+# ── Node linking helpers ──────────────────────────────────────────────────────
+def _b64u_encode(s: str) -> str:
+    return base64.urlsafe_b64encode(s.encode("utf-8")).decode().rstrip("=")
+
+
+def _b64u_decode(s: str) -> str:
+    pad = "=" * (-len(s) % 4)
+    return base64.urlsafe_b64decode(s + pad).decode("utf-8")
+
+
+def build_node_key(host: str, secret: str) -> str:
+    """کلید خودکفا: دامنه‌ی این پنل داخل خودِ کلید کدگذاری میشه."""
+    return f"{NODE_KEY_PREFIX}{_b64u_encode(host)}.{secret}"
+
+
+def parse_node_key(key: str) -> tuple[str, str]:
+    """برمی‌گرداند (host, secret). در صورت نامعتبر بودن ValueError می‌دهد."""
+    key = (key or "").strip()
+    if not key.startswith(NODE_KEY_PREFIX):
+        raise ValueError("کلید باید با rvg- شروع شود")
+    body = key[len(NODE_KEY_PREFIX):]
+    if "." not in body:
+        raise ValueError("ساختار کلید نامعتبر است")
+    host_part, secret = body.split(".", 1)
+    if not secret:
+        raise ValueError("بخش سکرت کلید خالی است")
+    try:
+        host = _b64u_decode(host_part).strip()
+    except Exception:
+        raise ValueError("دامنه‌ی داخل کلید قابل خواندن نیست")
+    if not host or "/" in host or " " in host:
+        raise ValueError("دامنه‌ی داخل کلید نامعتبر است")
+    return host, secret
+
+
+def _node_scheme(host: str) -> str:
+    # فقط برای تست محلی http مجاز است؛ در بقیه‌ی موارد اجباراً https
+    return "http" if host.startswith(("localhost", "127.0.0.1")) else "https"
+
+
+def _normalize_node(n: dict) -> dict:
+    share = n.get("share") or {}
+    return {
+        "label": str(n.get("label") or n.get("host") or "نود")[:60],
+        "host": str(n.get("host") or ""),
+        "key": str(n.get("key") or ""),
+        "enabled": bool(n.get("enabled", True)),
+        "merge_dashboard": bool(n.get("merge_dashboard", True)),
+        "share": {p: bool(share.get(p, p != "logs")) for p in NODE_SHARE_PARTS},
+        "created_at": n.get("created_at") or datetime.now().isoformat(),
+        "last_sync_at": n.get("last_sync_at"),
+        "last_error": n.get("last_error"),
+        "peer_version": n.get("peer_version"),
+    }
+
+
+def _node_public(node_id: str, n: dict) -> dict:
+    """نسخه‌ی امن برای فرانت‌اند — کلید خام بیرون نمی‌رود."""
+    out = {k: v for k, v in n.items() if k != "key"}
+    out["node_id"] = node_id
+    out["key_preview"] = (n.get("key") or "")[:14] + "…"
+    return out
+
+
+async def _node_request(node: dict, method: str, path: str, *,
+                        params: dict | None = None,
+                        json_body: dict | None = None,
+                        timeout: float = 10.0) -> httpx.Response:
+    host = node["host"]
+    url = f"{_node_scheme(host)}://{host}{path}"
+    client = http_client or httpx.AsyncClient()
+    return await client.request(
+        method, url,
+        params=params, json=json_body,
+        headers={NODE_KEY_HEADER: node["key"]},
+        timeout=timeout, follow_redirects=False,
+    )
+
+
+async def require_node_key(request: Request) -> str:
+    """احراز هویت پنل مقابل با هدر X-RVG-Node-Key (بدون کوکی سشن)."""
+    raw = (request.headers.get(NODE_KEY_HEADER) or "").strip()
+    if not raw:
+        raise HTTPException(status_code=401, detail="node key missing")
+    try:
+        _, secret = parse_node_key(raw)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="invalid node key")
+    matched = None
+    async with NODE_KEYS_LOCK:
+        for key_id, entry in NODE_KEYS.items():
+            if entry.get("revoked"):
+                continue
+            if secrets.compare_digest(str(entry.get("secret", "")), secret):
+                matched = key_id
+                break
+        if matched is None:
+            raise HTTPException(status_code=401, detail="unknown or revoked node key")
+        entry = NODE_KEYS[matched]
+        entry["last_used_at"] = datetime.now().isoformat()
+        entry["use_count"] = int(entry.get("use_count", 0)) + 1
+    asyncio.create_task(schedule_save())
+    return matched
+
 # ── Default link ──────────────────────────────────────────────────────────────
 _default_link_created = False
 
@@ -605,9 +760,7 @@ async def subscription_all(_=Depends(require_auth)):
 # SUB GROUP endpoints (بدون تغییر)
 # ══════════════════════════════════════════════════════════════════════════════
 
-@app.post("/api/subs")
-async def create_sub(request: Request, _=Depends(require_auth)):
-    body = await request.json()
+async def _create_sub_core(body: dict) -> dict:
     name = (body.get("name") or "گروه جدید").strip()[:60]
     desc = (body.get("desc") or "").strip()[:200]
     password = (body.get("password") or "").strip()
@@ -621,6 +774,7 @@ async def create_sub(request: Request, _=Depends(require_auth)):
             "uuid_key": uuid_key,
             "created_at": datetime.now().isoformat(),
             "link_ids": [],
+            "node_link_ids": [],
         }
     asyncio.create_task(save_state())
     log_activity("sub", f"گروه «{name}» ساخته شد", "ok")
@@ -632,6 +786,17 @@ async def create_sub(request: Request, _=Depends(require_auth)):
         "sub_url": f"https://{host}/sub-group/{uuid_key}",
     }
 
+@app.post("/api/subs")
+async def create_sub(request: Request, _=Depends(require_auth)):
+    body = await request.json()
+    return await _create_sub_core(body)
+
+@app.post("/api/node/subs")
+async def node_create_sub(request: Request, key_id: str = Depends(require_node_key)):
+    await _require_node_manage(key_id)
+    body = await request.json()
+    return await _create_sub_core(body)
+
 @app.get("/api/subs")
 async def list_subs(_=Depends(require_auth)):
     host = get_host()
@@ -642,15 +807,20 @@ async def list_subs(_=Depends(require_auth)):
     result = []
     for sid, s in snap_subs.items():
         link_ids = s.get("link_ids", [])
+        node_link_ids = s.get("node_link_ids", [])
+        foreign_links = s.get("foreign_links", [])
         active_count = sum(1 for lid in link_ids if is_link_allowed(snap_links.get(lid)))
         total_used = sum(snap_links[lid].get("used_bytes", 0) for lid in link_ids if lid in snap_links)
+        total_used += sum(int(fl.get("used_bytes") or 0) for fl in foreign_links)
         result.append({
             "sub_id": sid,
             **s,
+            "node_link_ids": node_link_ids,
+            "foreign_links": foreign_links,
             "password_hash": None,
             "has_password": s.get("password_hash") is not None,
-            "links_count": len(link_ids),
-            "active_count": active_count,
+            "links_count": len(link_ids) + len(node_link_ids) + len(foreign_links),
+            "active_count": active_count + len(foreign_links),
             "total_used_bytes": total_used,
             "total_used_fmt": fmt_bytes(total_used),
             "public_url": f"https://{host}/p/{s['uuid_key']}",
@@ -675,6 +845,22 @@ async def update_sub(sub_id: str, request: Request, _=Depends(require_auth)):
             s["password_hash"] = hash_password(pw) if pw else None
         if "link_ids" in body:
             s["link_ids"] = list(body["link_ids"])
+        if "node_link_ids" in body:
+            s["node_link_ids"] = [str(x) for x in body["node_link_ids"] if "::" in str(x)]
+        if "foreign_links" in body:
+            fl = body["foreign_links"] if isinstance(body["foreign_links"], list) else []
+            clean = []
+            for it in fl:
+                if not isinstance(it, dict) or not it.get("vless_link"):
+                    continue
+                clean.append({
+                    "key": str(it.get("key") or "")[:120],
+                    "label": str(it.get("label") or "کانفیگ")[:60],
+                    "vless_link": str(it.get("vless_link"))[:2000],
+                    "used_bytes": int(it.get("used_bytes") or 0),
+                    "source": str(it.get("source") or "")[:60],
+                })
+            s["foreign_links"] = clean
     asyncio.create_task(save_state())
     return {"ok": True}
 
@@ -715,6 +901,26 @@ async def assign_link_to_sub(sub_id: str, request: Request, _=Depends(require_au
     asyncio.create_task(save_state())
     return {"ok": True}
 
+# ── مدیریت گروه از راه دور (توسط پنل مرکزی روی این نود) ──────────────────────
+@app.patch("/api/node/subs/{sub_id}")
+async def node_update_sub(sub_id: str, request: Request, key_id: str = Depends(require_node_key)):
+    peer = await _require_node_manage(key_id)
+    result = await update_sub(sub_id, request, None)
+    log_activity("node", f"گروه {sub_id[:8]} از راه دور توسط «{peer}» ویرایش شد", "warn")
+    return result
+
+@app.delete("/api/node/subs/{sub_id}")
+async def node_delete_sub(sub_id: str, key_id: str = Depends(require_node_key)):
+    peer = await _require_node_manage(key_id)
+    result = await delete_sub(sub_id, None)
+    log_activity("node", f"گروه {sub_id[:8]} از راه دور توسط «{peer}» حذف شد", "err")
+    return result
+
+@app.post("/api/node/subs/{sub_id}/links")
+async def node_assign_link_to_sub(sub_id: str, request: Request, key_id: str = Depends(require_node_key)):
+    await _require_node_manage(key_id)
+    return await assign_link_to_sub(sub_id, request, None)
+
 # ── Public sub-group subscription file ───────────────────────────────────────
 @app.get("/sub-group/{uuid_key}")
 async def sub_group_subscription(uuid_key: str, request: Request):
@@ -728,6 +934,7 @@ async def sub_group_subscription(uuid_key: str, request: Request):
             raise HTTPException(status_code=403, detail="wrong password")
     host = get_host()
     link_ids = sub.get("link_ids", [])
+    node_link_ids = sub.get("node_link_ids", [])
     async with LINKS_LOCK:
         lines = []
         allowed_links = []
@@ -739,9 +946,47 @@ async def sub_group_subscription(uuid_key: str, request: Request):
         total_used = sum(l.get("used_bytes", 0) for l in allowed_links)
         total_limit = sum(l.get("limit_bytes", 0) for l in allowed_links)
         expiries = [l["expires_at"] for l in allowed_links if l.get("expires_at")]
+    if node_link_ids:
+        async with NODES_LOCK:
+            nodes_snap = {nid: dict(n) for nid, n in NODES.items()}
+        needed_nodes = list({ref.split("::", 1)[0] for ref in node_link_ids if "::" in ref})
+        needed_nodes = [nid for nid in needed_nodes if nid in nodes_snap]
+        snapshots = await asyncio.gather(
+            *(_fetch_node_snapshot(nid, nodes_snap[nid], fresh=True) for nid in needed_nodes),
+            return_exceptions=True,
+        )
+        snap_by_node = dict(zip(needed_nodes, snapshots))
+        for ref in node_link_ids:
+            if "::" not in ref:
+                continue
+            nid, uid = ref.split("::", 1)
+            snap = snap_by_node.get(nid)
+            if not snap or isinstance(snap, Exception):
+                continue
+            node_link = next((l for l in (snap.get("links") or []) if l.get("uuid") == uid), None)
+            if not node_link or not node_link.get("vless_link"):
+                continue
+            if not node_link.get("active", True):
+                continue
+            if node_link.get("expired"):
+                continue
+            lb = node_link.get("limit_bytes", 0)
+            if lb > 0 and node_link.get("used_bytes", 0) >= lb:
+                continue
+            lines.append(node_link["vless_link"])
+            total_used += node_link.get("used_bytes", 0)
+            total_limit += node_link.get("limit_bytes", 0)
+            if node_link.get("expires_at"):
+                expiries.append(node_link["expires_at"])
+    for fl in sub.get("foreign_links", []):
+        vl = fl.get("vless_link")
+        if not vl:
+            continue
+        lines.append(vl)
+        total_used += int(fl.get("used_bytes") or 0)
     nearest_exp = min(expiries) if expiries else None
     content = base64.b64encode("\n".join(lines).encode()).decode()
-    headers = build_sub_headers(sub["name"], total_used, total_limit, nearest_exp)
+    headers = build_sub_headers(f"پنل: {sub['name']}", total_used, total_limit, nearest_exp)
     return Response(content=content, media_type="text/plain", headers=headers)
 
 # ── Auth endpoints ────────────────────────────────────────────────────────────
@@ -791,6 +1036,10 @@ async def backup_export(_=Depends(require_auth)):
         links_snap = dict(LINKS)
     async with SUBS_LOCK:
         subs_snap = dict(SUBS)
+    async with NODE_KEYS_LOCK:
+        node_keys_snap = dict(NODE_KEYS)
+    async with NODES_LOCK:
+        nodes_snap = dict(NODES)
     data = {
         "kind": "rvg-backup",
         "version": "9.2",
@@ -798,6 +1047,8 @@ async def backup_export(_=Depends(require_auth)):
         "host": get_host(),
         "links": links_snap,
         "subs": subs_snap,
+        "node_keys": node_keys_snap,
+        "nodes": nodes_snap,
         "password_hash": AUTH["password_hash"],
     }
     content = json.dumps(data, ensure_ascii=False, indent=2)
@@ -838,6 +1089,21 @@ async def backup_import(request: Request, _=Depends(require_auth)):
         SUBS.clear()
         SUBS.update(new_subs)
 
+    # نودها و کلیدهای نود اختیاری‌اند (بکاپ‌های قدیمی این کلیدها را ندارند)
+    new_node_keys = data.get("node_keys")
+    if isinstance(new_node_keys, dict):
+        async with NODE_KEYS_LOCK:
+            NODE_KEYS.clear()
+            NODE_KEYS.update(new_node_keys)
+    new_nodes = data.get("nodes")
+    if isinstance(new_nodes, dict):
+        async with NODES_LOCK:
+            NODES.clear()
+            for nid, n in new_nodes.items():
+                if isinstance(n, dict):
+                    NODES[nid] = _normalize_node(n)
+        _NODE_CACHE.clear()
+
     if not keep_password and new_pw_hash:
         AUTH["password_hash"] = new_pw_hash
         async with SESSIONS_LOCK:
@@ -855,7 +1121,7 @@ async def backup_import(request: Request, _=Depends(require_auth)):
         logger.error(f"راه‌اندازی مجدد MTProto بعد از ایمپورت ناموفق بود: {exc}")
 
     log_activity("system", "بکاپ با موفقیت روی پنل بازیابی شد", "ok")
-    return {"ok": True, "links_count": len(LINKS), "subs_count": len(SUBS)}
+    return {"ok": True, "links_count": len(LINKS), "subs_count": len(SUBS), "nodes_count": len(NODES)}
     
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
@@ -1011,9 +1277,7 @@ async def get_connections(_=Depends(require_auth)):
     }
 
 # ── Link Management ───────────────────────────────────────────────────────────
-@app.post("/api/links")
-async def create_link(request: Request, _=Depends(require_auth)):
-    body = await request.json()
+async def _create_link_core(body: dict) -> dict:
     label = (body.get("label") or "لینک جدید").strip()[:60]
     lv = float(body.get("limit_value") or 0)
     lu = body.get("limit_unit") or "GB"
@@ -1078,7 +1342,7 @@ async def create_link(request: Request, _=Depends(require_auth)):
             asyncio.create_task(_attach_mtproto_public_proxy(uid, inst["port"], label))
 
 
-    if protocol == "shadowsocks" or protocol.startswith("shadowsocks-xhttp-"):
+    if protocol == "shadowsocks":
         ss_cipher = body.get("ss_cipher") or DEFAULT_CIPHER
         if ss_cipher not in CIPHERS:
             ss_cipher = DEFAULT_CIPHER
@@ -1105,6 +1369,18 @@ async def create_link(request: Request, _=Depends(require_auth)):
         "vless_link": generate_share_link(uid, host, remark=f"RVG-{label}", protocol=protocol),
         "sub_url": f"https://{host}/sub/{uid}",
     }
+
+@app.post("/api/links")
+async def create_link(request: Request, _=Depends(require_auth)):
+    body = await request.json()
+    return await _create_link_core(body)
+
+@app.post("/api/node/links")
+async def node_create_link(request: Request, key_id: str = Depends(require_node_key)):
+    await _require_node_manage(key_id)
+    body = await request.json()
+    # sub_id در اینجا به گروهِ محلیِ همین نود اشاره دارد (نه پنل مرکزی)؛ اگر معتبر نباشد نادیده گرفته می‌شود
+    return await _create_link_core(body)
 
 @app.get("/api/links")
 async def list_links(_=Depends(require_auth)):
@@ -1279,6 +1555,568 @@ async def delete_link(uid: str, _=Depends(require_auth)):
     return {"ok": True, "deleted": uid}
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Node linking — inbound (این پنل صادرکننده‌ی کلید است)
+# احراز هویت این بخش با هدر X-RVG-Node-Key انجام می‌شود، نه کوکی سشن.
+# ══════════════════════════════════════════════════════════════════════════════
+def _parse_parts(raw: str | None) -> set[str]:
+    if not raw:
+        return set()
+    return {p.strip() for p in raw.split(",") if p.strip() in NODE_SHARE_PARTS}
+
+
+@app.post("/api/node/handshake")
+async def node_handshake(request: Request, key_id: str = Depends(require_node_key)):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    async with NODE_KEYS_LOCK:
+        pw_hash = (NODE_KEYS.get(key_id) or {}).get("password_hash")
+    if pw_hash:
+        given = str(body.get("password") or "")
+        if not given:
+            raise HTTPException(status_code=401, detail="PASSWORD_REQUIRED")
+        if hash_password(given) != pw_hash:
+            raise HTTPException(status_code=401, detail="PASSWORD_INVALID")
+    peer_host = str(body.get("host") or "").strip()[:120] or client_ip(request)
+    async with NODE_KEYS_LOCK:
+        entry = NODE_KEYS.get(key_id)
+        if entry is not None:
+            first_time = not entry.get("peer_host")
+            entry["peer_host"] = peer_host
+            label = entry.get("label") or key_id[:8]
+        else:
+            first_time, label = False, key_id[:8]
+    if first_time:
+        log_activity("node", f"پنل «{peer_host}» با کلید «{label}» متصل شد", "ok")
+    async with LINKS_LOCK:
+        links_count = len(LINKS)
+    async with SUBS_LOCK:
+        subs_count = len(SUBS)
+    return {
+        "ok": True,
+        "host": get_host(),
+        "version": get_current_version(),
+        "links_count": links_count,
+        "subs_count": subs_count,
+    }
+
+
+@app.get("/api/node/snapshot")
+async def node_snapshot(request: Request, _key_id: str = Depends(require_node_key)):
+    """فقط بخش‌هایی که هم درخواست شده و هم برای این کلید مجاز است برگردانده می‌شود."""
+    parts = _parse_parts(request.query_params.get("parts"))
+    async with NODE_KEYS_LOCK:
+        entry = NODE_KEYS.get(_key_id) or {}
+        allowed = {p for p in NODE_SHARE_PARTS if (entry.get("share") or {}).get(p, p != "logs")}
+    parts &= allowed
+    out: dict = {"host": get_host(), "version": get_current_version(), "parts": sorted(parts)}
+    if "links" in parts:
+        out["links"] = (await list_links(None))["links"]
+    if "subs" in parts:
+        out["subs"] = (await list_subs(None))["subs"]
+    if "logs" in parts:
+        out["logs"] = (await get_activity(None))["logs"][-60:]
+    if parts & {"usage", "requests"}:
+        s = await get_stats(None)
+        stats_out = {
+            "uptime": s["uptime"],
+            "links_count": s["links_count"],
+            "active_links": s["active_links"],
+            "subs_count": s["subs_count"],
+        }
+        if "usage" in parts:
+            stats_out["total_bytes"] = stats["total_bytes"]
+            stats_out["total_traffic_mb"] = s["total_traffic_mb"]
+            stats_out["hourly"] = s["hourly"]
+            stats_out["active_connections"] = s["active_connections"]
+        if "requests" in parts:
+            stats_out["total_requests"] = s["total_requests"]
+            stats_out["total_errors"] = s["total_errors"]
+        out["stats"] = stats_out
+    return out
+
+
+async def _require_node_manage(key_id: str) -> str:
+    async with NODE_KEYS_LOCK:
+        entry = NODE_KEYS.get(key_id) or {}
+        peer = entry.get("peer_host") or "نود"
+        allowed = bool(entry.get("can_manage", False))
+    if not allowed:
+        raise HTTPException(status_code=403, detail="این کلید اجازه‌ی ویرایش/حذف کانفیگ را ندارد")
+    return peer
+
+
+@app.patch("/api/node/links/{uid}")
+async def node_update_link(uid: str, request: Request, key_id: str = Depends(require_node_key)):
+    peer = await _require_node_manage(key_id)
+    result = await update_link(uid, request, None)
+    log_activity("node", f"کانفیگ {uid[:8]} از راه دور توسط «{peer}» ویرایش شد", "warn")
+    return result
+
+
+@app.delete("/api/node/links/{uid}")
+async def node_delete_link(uid: str, key_id: str = Depends(require_node_key)):
+    peer = await _require_node_manage(key_id)
+    result = await delete_link(uid, None)
+    log_activity("node", f"کانفیگ {uid[:8]} از راه دور توسط «{peer}» حذف شد", "err")
+    return result
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Node linking — outbound (این پنل به نودهای دیگر وصل می‌شود)
+# ══════════════════════════════════════════════════════════════════════════════
+@app.get("/api/nodes/keys")
+async def list_node_keys(_=Depends(require_auth)):
+    host = get_host()
+    async with NODE_KEYS_LOCK:
+        snap = dict(NODE_KEYS)
+    out = []
+    for key_id, e in snap.items():
+        out.append({
+            "key_id": key_id,
+            "label": e.get("label", ""),
+            "key": build_node_key(e.get("issued_host") or host, e.get("secret", "")),
+            "created_at": e.get("created_at"),
+            "revoked": bool(e.get("revoked")),
+            "share": {p: bool((e.get("share") or {}).get(p, p != "logs")) for p in NODE_SHARE_PARTS},
+            "can_manage": bool(e.get("can_manage", False)),
+            "has_password": e.get("password_hash") is not None,
+            "last_used_at": e.get("last_used_at"),
+            "peer_host": e.get("peer_host"),
+            "use_count": int(e.get("use_count", 0)),
+        })
+    out.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+    return {"keys": out, "host": host}
+
+
+def _node_key_share(body_share) -> dict:
+    """دسترسی‌های خواندن هر کلید؛ پیش‌فرض مثل خروجی نود: همه فعال جز لاگ‌ها."""
+    src = body_share if isinstance(body_share, dict) else {}
+    return {p: bool(src.get(p, p != "logs")) for p in NODE_SHARE_PARTS}
+
+
+@app.post("/api/nodes/keys")
+async def create_node_key(request: Request, _=Depends(require_auth)):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    label = (str(body.get("label") or "").strip() or f"کلید {len(NODE_KEYS) + 1}")[:60]
+    share = _node_key_share(body.get("share"))
+    can_manage = bool(body.get("can_manage", False))
+    password = str(body.get("password") or "").strip()
+    host = get_host()
+    key_id = generate_uuid()
+    secret = secrets.token_urlsafe(24)
+    async with NODE_KEYS_LOCK:
+        NODE_KEYS[key_id] = {
+            "label": label,
+            "secret": secret,
+            "issued_host": host,
+            "created_at": datetime.now().isoformat(),
+            "revoked": False,
+            "share": share,
+            "can_manage": can_manage,
+            "password_hash": hash_password(password) if password else None,
+            "last_used_at": None,
+            "peer_host": None,
+            "use_count": 0,
+        }
+    asyncio.create_task(save_state())
+    log_activity("node", f"کلید نود «{label}» ساخته شد", "ok")
+    return {
+        "ok": True, "key_id": key_id, "label": label,
+        "key": build_node_key(host, secret), "share": share, "can_manage": can_manage,
+    }
+
+
+@app.patch("/api/nodes/keys/{key_id}")
+async def update_node_key(key_id: str, request: Request, _=Depends(require_auth)):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    async with NODE_KEYS_LOCK:
+        entry = NODE_KEYS.get(key_id)
+        if entry is None:
+            raise HTTPException(status_code=404, detail="key not found")
+        if "label" in body:
+            entry["label"] = (str(body.get("label") or "").strip() or entry["label"])[:60]
+        if "share" in body:
+            cur = entry.get("share") or {}
+            src = body.get("share") if isinstance(body.get("share"), dict) else {}
+            entry["share"] = {p: bool(src.get(p, cur.get(p, p != "logs"))) for p in NODE_SHARE_PARTS}
+        if "can_manage" in body:
+            entry["can_manage"] = bool(body.get("can_manage"))
+        if "password" in body:
+            pw = str(body.get("password") or "").strip()
+            entry["password_hash"] = hash_password(pw) if pw else None
+        if "enabled" in body:
+            entry["revoked"] = not bool(body.get("enabled"))
+        label = entry.get("label", key_id[:8])
+        revoked = entry["revoked"]
+    asyncio.create_task(save_state())
+    log_activity("node", f"کلید نود «{label}» {'غیرفعال شد' if revoked else 'به‌روزرسانی شد'}",
+                 "warn" if revoked else "ok")
+    return {"ok": True, "key_id": key_id}
+
+
+@app.delete("/api/nodes/keys/{key_id}")
+async def revoke_node_key(key_id: str, _=Depends(require_auth)):
+    async with NODE_KEYS_LOCK:
+        entry = NODE_KEYS.get(key_id)
+        if entry is None:
+            raise HTTPException(status_code=404, detail="key not found")
+        label = entry.get("label", key_id[:8])
+        del NODE_KEYS[key_id]
+    asyncio.create_task(save_state())
+    log_activity("node", f"کلید نود «{label}» حذف شد", "warn")
+    return {"ok": True, "revoked": key_id}
+
+
+@app.get("/api/nodes/aggregate")
+async def nodes_aggregate(request: Request, _=Depends(require_auth)):
+    fresh = request.query_params.get("fresh") in ("1", "true", "yes")
+    async with NODES_LOCK:
+        snap = {nid: dict(n) for nid, n in NODES.items()}
+    targets = [(nid, n) for nid, n in snap.items() if n.get("enabled", True)]
+    results = await asyncio.gather(
+        *(_fetch_node_snapshot(nid, n, fresh=fresh) for nid, n in targets),
+        return_exceptions=True,
+    )
+
+    nodes_out: list[dict] = []
+    for (nid, n), res in zip(targets, results):
+        base = _node_public(nid, n)
+        if isinstance(res, Exception):
+            base.update({"online": False, "error": str(res)[:200]})
+        else:
+            base.update(res)
+        nodes_out.append(base)
+    for nid, n in snap.items():
+        if not n.get("enabled", True):
+            nodes_out.append({**_node_public(nid, n), "online": False, "error": None, "disabled": True})
+
+    local = await get_stats(None)
+    async with LINKS_LOCK:
+        local_used = sum(l.get("used_bytes", 0) for l in LINKS.values())
+    totals = {
+        "local_used_bytes": local_used,
+        "local_requests": local["total_requests"],
+        "local_links": local["links_count"],
+        "local_active_links": local["active_links"],
+        "local_subs": local["subs_count"],
+        "local_connections": local["active_connections"],
+        "node_used_bytes": 0, "node_requests": 0, "node_links": 0,
+        "node_active_links": 0, "node_subs": 0, "node_connections": 0,
+        "nodes_total": len(snap), "nodes_online": 0,
+    }
+    for n in nodes_out:
+        if not n.get("online"):
+            continue
+        totals["nodes_online"] += 1
+        share = n.get("share") or {}
+        st = n.get("stats") or {}
+        if share.get("usage"):
+            totals["node_used_bytes"] += int(st.get("total_bytes") or 0)
+            totals["node_connections"] += int(st.get("active_connections") or 0)
+        if share.get("requests"):
+            totals["node_requests"] += int(st.get("total_requests") or 0)
+        if share.get("links"):
+            links = n.get("links") or []
+            totals["node_links"] += len(links)
+            totals["node_active_links"] += sum(1 for l in links if l.get("active") and not l.get("expired"))
+        if share.get("subs"):
+            totals["node_subs"] += len(n.get("subs") or [])
+    totals["used_bytes"] = totals["local_used_bytes"] + totals["node_used_bytes"]
+    totals["used_fmt"] = fmt_bytes(totals["used_bytes"])
+    totals["node_used_fmt"] = fmt_bytes(totals["node_used_bytes"])
+    totals["requests"] = totals["local_requests"] + totals["node_requests"]
+    totals["links"] = totals["local_links"] + totals["node_links"]
+    totals["active_links"] = totals["local_active_links"] + totals["node_active_links"]
+    totals["subs"] = totals["local_subs"] + totals["node_subs"]
+    totals["connections"] = totals["local_connections"] + totals["node_connections"]
+    return {"nodes": nodes_out, "totals": totals}
+
+
+async def _fetch_node_snapshot(node_id: str, node: dict, *, fresh: bool = False) -> dict:
+    """اسنپ‌شات یک نود را با کش کوتاه‌مدت می‌گیرد. فقط بخش‌های تیک‌خورده منتقل می‌شوند."""
+    share = node.get("share") or {}
+    parts = sorted(p for p in NODE_SHARE_PARTS if share.get(p))
+    cache_key = f"{node_id}|{','.join(parts)}"
+    cached = _NODE_CACHE.get(cache_key)
+    if not fresh and cached and (time.time() - cached["at"]) < NODE_CACHE_TTL:
+        return cached["data"]
+    if not parts:
+        return {"online": True, "error": None, "stats": {}, "links": [], "subs": [], "logs": []}
+    try:
+        r = await _node_request(node, "GET", "/api/node/snapshot", params={"parts": ",".join(parts)})
+        if r.status_code == 401:
+            raise RuntimeError("کلید نود روی پنل مقابل ابطال شده است")
+        if r.status_code != 200:
+            raise RuntimeError(f"HTTP {r.status_code}")
+        payload = r.json()
+    except Exception as exc:
+        msg = str(exc)[:200] or exc.__class__.__name__
+        async with NODES_LOCK:
+            if node_id in NODES:
+                NODES[node_id]["last_error"] = msg
+        return {"online": False, "error": msg, "stats": {}, "links": [], "subs": [], "logs": []}
+
+    now_iso = datetime.now().isoformat()
+    async with NODES_LOCK:
+        if node_id in NODES:
+            NODES[node_id]["last_sync_at"] = now_iso
+            NODES[node_id]["last_error"] = None
+            NODES[node_id]["peer_version"] = payload.get("version")
+    data = {
+        "online": True,
+        "error": None,
+        "last_sync_at": now_iso,
+        "peer_version": payload.get("version"),
+        "stats": payload.get("stats") or {},
+        "links": payload.get("links") or [],
+        "subs": payload.get("subs") or [],
+        "logs": payload.get("logs") or [],
+    }
+    _NODE_CACHE[cache_key] = {"at": time.time(), "data": data}
+    asyncio.create_task(schedule_save())
+    return data
+
+
+@app.get("/api/nodes")
+async def list_nodes(_=Depends(require_auth)):
+    async with NODES_LOCK:
+        snap = {nid: dict(n) for nid, n in NODES.items()}
+    out = [_node_public(nid, n) for nid, n in snap.items()]
+    out.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+    return {"nodes": out, "count": len(out)}
+
+
+@app.post("/api/nodes/connect")
+async def connect_node(request: Request, _=Depends(require_auth)):
+    body = await request.json()
+    key = str(body.get("key") or "").strip()
+    try:
+        host, _secret = parse_node_key(key)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if host == get_host():
+        raise HTTPException(status_code=400, detail="این کلید مربوط به همین پنل است")
+    async with NODES_LOCK:
+        for nid, n in NODES.items():
+            if n.get("host") == host:
+                raise HTTPException(status_code=409, detail=f"این پنل قبلاً به‌عنوان «{n.get('label')}» متصل شده است")
+
+    node_password = str(body.get("password") or "").strip()
+    candidate = {"host": host, "key": key}
+    try:
+        r = await _node_request(candidate, "POST", "/api/node/handshake",
+                                json_body={"host": get_host(), "version": get_current_version(),
+                                           "password": node_password})
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"اتصال به {host} برقرار نشد: {str(exc)[:160]}")
+    if r.status_code == 401:
+        detail = ""
+        try:
+            detail = r.json().get("detail") or ""
+        except Exception:
+            pass
+        if detail == "PASSWORD_REQUIRED":
+            raise HTTPException(status_code=401, detail="این نود رمز دارد؛ رمز را وارد کنید")
+        if detail == "PASSWORD_INVALID":
+            raise HTTPException(status_code=401, detail="رمز نود اشتباه است")
+        raise HTTPException(status_code=401, detail="کلید توسط پنل مقابل پذیرفته نشد (ابطال‌شده یا نامعتبر)")
+    if r.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"پاسخ نامعتبر از {host}: HTTP {r.status_code}")
+    info = r.json()
+
+    label = (str(body.get("label") or "").strip() or info.get("host") or host)[:60]
+    node_id = generate_uuid()
+    node = _normalize_node({
+        "label": label, "host": host, "key": key,
+        "peer_version": info.get("version"),
+        "last_sync_at": datetime.now().isoformat(),
+    })
+    async with NODES_LOCK:
+        NODES[node_id] = node
+    _NODE_CACHE.clear()
+    asyncio.create_task(save_state())
+    log_activity("node", f"به نود «{label}» ({host}) متصل شد", "ok")
+    return {"ok": True, "node": _node_public(node_id, node), "peer": info}
+
+
+@app.patch("/api/nodes/{node_id}")
+async def update_node(node_id: str, request: Request, _=Depends(require_auth)):
+    body = await request.json()
+    async with NODES_LOCK:
+        node = NODES.get(node_id)
+        if node is None:
+            raise HTTPException(status_code=404, detail="node not found")
+        if "label" in body:
+            node["label"] = (str(body["label"]).strip() or node["host"])[:60]
+        if "enabled" in body:
+            node["enabled"] = bool(body["enabled"])
+        if "merge_dashboard" in body:
+            node["merge_dashboard"] = bool(body["merge_dashboard"])
+        share = body.get("share")
+        if isinstance(share, dict):
+            for p in NODE_SHARE_PARTS:
+                if p in share:
+                    node["share"][p] = bool(share[p])
+        snap = dict(node)
+    _NODE_CACHE.clear()
+    asyncio.create_task(save_state())
+    return {"ok": True, "node": _node_public(node_id, snap)}
+
+
+@app.delete("/api/nodes/{node_id}")
+async def disconnect_node(node_id: str, _=Depends(require_auth)):
+    async with NODES_LOCK:
+        node = NODES.pop(node_id, None)
+    if node is None:
+        raise HTTPException(status_code=404, detail="node not found")
+    _NODE_CACHE.clear()
+    asyncio.create_task(save_state())
+    log_activity("node", f"اتصال نود «{node.get('label')}» قطع شد", "warn")
+    return {"ok": True, "disconnected": node_id}
+
+
+async def _proxy_node_link_write(node_id: str, uid: str, method: str,
+                                 json_body: dict | None = None) -> dict:
+    async with NODES_LOCK:
+        node = NODES.get(node_id)
+        if node is None:
+            raise HTTPException(status_code=404, detail="node not found")
+        snap = dict(node)
+    try:
+        r = await _node_request(snap, method, f"/api/node/links/{uid}", json_body=json_body)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"نود پاسخ نداد: {str(exc)[:160]}")
+    if r.status_code >= 400:
+        detail = f"HTTP {r.status_code}"
+        try:
+            detail = r.json().get("detail") or detail
+        except Exception:
+            pass
+        raise HTTPException(status_code=r.status_code, detail=detail)
+    _NODE_CACHE.clear()
+    return r.json() if r.content else {"ok": True}
+
+
+@app.post("/api/nodes/{node_id}/subs")
+async def proxy_node_create_sub(node_id: str, request: Request, _=Depends(require_auth)):
+    body = await request.json()
+    async with NODES_LOCK:
+        node = NODES.get(node_id)
+        if node is None:
+            raise HTTPException(status_code=404, detail="node not found")
+        snap = dict(node)
+    try:
+        r = await _node_request(snap, "POST", "/api/node/subs", json_body=body)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"نود پاسخ نداد: {str(exc)[:160]}")
+    if r.status_code >= 400:
+        detail = f"HTTP {r.status_code}"
+        try:
+            detail = r.json().get("detail") or detail
+        except Exception:
+            pass
+        raise HTTPException(status_code=r.status_code, detail=detail)
+    _NODE_CACHE.clear()
+    return r.json()
+
+
+async def _proxy_node_sub_write(node_id: str, sub_id: str, method: str,
+                                 json_body: dict | None = None) -> dict:
+    async with NODES_LOCK:
+        node = NODES.get(node_id)
+        if node is None:
+            raise HTTPException(status_code=404, detail="node not found")
+        snap = dict(node)
+    try:
+        r = await _node_request(snap, method, f"/api/node/subs/{sub_id}", json_body=json_body)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"نود پاسخ نداد: {str(exc)[:160]}")
+    if r.status_code >= 400:
+        detail = f"HTTP {r.status_code}"
+        try:
+            detail = r.json().get("detail") or detail
+        except Exception:
+            pass
+        raise HTTPException(status_code=r.status_code, detail=detail)
+    _NODE_CACHE.clear()
+    return r.json() if r.content else {"ok": True}
+
+
+@app.patch("/api/nodes/{node_id}/subs/{sub_id}")
+async def proxy_node_update_sub(node_id: str, sub_id: str, request: Request, _=Depends(require_auth)):
+    body = await request.json()
+    return await _proxy_node_sub_write(node_id, sub_id, "PATCH", json_body=body)
+
+
+@app.delete("/api/nodes/{node_id}/subs/{sub_id}")
+async def proxy_node_delete_sub(node_id: str, sub_id: str, _=Depends(require_auth)):
+    return await _proxy_node_sub_write(node_id, sub_id, "DELETE")
+
+
+@app.post("/api/nodes/{node_id}/subs/{sub_id}/links")
+async def proxy_node_assign_link_to_sub(node_id: str, sub_id: str, request: Request, _=Depends(require_auth)):
+    body = await request.json()
+    async with NODES_LOCK:
+        node = NODES.get(node_id)
+        if node is None:
+            raise HTTPException(status_code=404, detail="node not found")
+        snap = dict(node)
+    try:
+        r = await _node_request(snap, "POST", f"/api/node/subs/{sub_id}/links", json_body=body)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"نود پاسخ نداد: {str(exc)[:160]}")
+    if r.status_code >= 400:
+        detail = f"HTTP {r.status_code}"
+        try:
+            detail = r.json().get("detail") or detail
+        except Exception:
+            pass
+        raise HTTPException(status_code=r.status_code, detail=detail)
+    _NODE_CACHE.clear()
+    return r.json() if r.content else {"ok": True}
+
+
+@app.post("/api/nodes/{node_id}/links")
+async def proxy_node_create_link(node_id: str, request: Request, _=Depends(require_auth)):
+    body = await request.json()
+    async with NODES_LOCK:
+        node = NODES.get(node_id)
+        if node is None:
+            raise HTTPException(status_code=404, detail="node not found")
+        snap = dict(node)
+    try:
+        r = await _node_request(snap, "POST", "/api/node/links", json_body=body)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"نود پاسخ نداد: {str(exc)[:160]}")
+    if r.status_code >= 400:
+        detail = f"HTTP {r.status_code}"
+        try:
+            detail = r.json().get("detail") or detail
+        except Exception:
+            pass
+        raise HTTPException(status_code=r.status_code, detail=detail)
+    _NODE_CACHE.clear()
+    return r.json()
+
+
+@app.patch("/api/nodes/{node_id}/links/{uid}")
+async def proxy_node_update_link(node_id: str, uid: str, request: Request, _=Depends(require_auth)):
+    body = await request.json()
+    return await _proxy_node_link_write(node_id, uid, "PATCH", json_body=body)
+
+
+@app.delete("/api/nodes/{node_id}/links/{uid}")
+async def proxy_node_delete_link(node_id: str, uid: str, _=Depends(require_auth)):
+    return await _proxy_node_link_write(node_id, uid, "DELETE")
+
+# ══════════════════════════════════════════════════════════════════════════════
 # VLESS Relay
 # ══════════════════════════════════════════════════════════════════════════════
 from protocol.vless.vless import (
@@ -1294,37 +2132,28 @@ from protocol.trojan.websocket import trojan_ws_tunnel
 
 app.add_api_websocket_route("/ws/{uuid}", websocket_tunnel)
 app.add_api_websocket_route("/trojan-ws", trojan_ws_tunnel)
-from protocol.shadowsocks.shadowsocks import generate_ss_link, generate_ss_xhttp_link, derive_key, CIPHERS, DEFAULT_CIPHER
+from protocol.shadowsocks.shadowsocks import generate_ss_link, derive_key, CIPHERS, DEFAULT_CIPHER
 from protocol.shadowsocks.websocket import shadowsocks_ws_tunnel
 app.add_api_websocket_route("/ss-ws", shadowsocks_ws_tunnel)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # XHTTP
 # ══════════════════════════════════════════════════════════════════════════════
+# نکته: مطابق نسخه‌ی مرجع (xhttp_siz10.py) مود stream-one حذف شده؛ فقط
+# packet-up و stream-up فعال هستن. روترهای stream-one دیگه include نمی‌شن.
 from protocol.vless.xhttpstreamon import router as xhttp_downlink_router
 from protocol.vless.xhttpstreamup import router as xhttp_streamup_router
 from protocol.vless.xhttshadpacketup import router as xhttp_packetup_router
-from protocol.vless.xhttpstreamone import router as xhttp_streamone_router
 app.include_router(xhttp_downlink_router)
 app.include_router(xhttp_streamup_router)
 app.include_router(xhttp_packetup_router)
-app.include_router(xhttp_streamone_router)
 
 from protocol.trojan.xhttpstreamon import router as trojan_xhttp_downlink_router
 from protocol.trojan.xhttpstreamup import router as trojan_xhttp_streamup_router
 from protocol.trojan.xhttshadpacketup import router as trojan_xhttp_packetup_router
-from protocol.trojan.xhttpstreamone import router as trojan_xhttp_streamone_router
 app.include_router(trojan_xhttp_downlink_router)
 app.include_router(trojan_xhttp_streamup_router)
 app.include_router(trojan_xhttp_packetup_router)
-app.include_router(trojan_xhttp_streamone_router)
-
-from protocol.shadowsocks.xhttshadstron import router as ss_xhttp_downlink_router
-from protocol.shadowsocks.xhttshadpacketup import router as ss_xhttp_packetup_router
-from protocol.shadowsocks.xhttshadstrup import router as ss_xhttp_streamup_router
-app.include_router(ss_xhttp_downlink_router)
-app.include_router(ss_xhttp_packetup_router)
-app.include_router(ss_xhttp_streamup_router)
 
 # ── HTTP Proxy ────────────────────────────────────────────────────────────────
 _HOP = {"connection","keep-alive","proxy-authenticate","proxy-authorization",
@@ -1377,6 +2206,7 @@ async def public_sub_data(uuid_key: str, request: Request):
 
     host = get_host()
     link_ids = sub.get("link_ids", [])
+    node_link_ids = sub.get("node_link_ids", [])
     async with LINKS_LOCK:
         snap = dict(LINKS)
 
@@ -1401,6 +2231,56 @@ async def public_sub_data(uuid_key: str, request: Request):
             "vless_link": generate_share_link(lid, host, remark=f"RVG-{link['label']}", protocol=proto),
         })
 
+    # ۲.۵ کانفیگ‌های نودهای دیگر
+    if node_link_ids:
+        async with NODES_LOCK:
+            nodes_snap = {nid: dict(n) for nid, n in NODES.items()}
+        needed_nodes = list({ref.split("::", 1)[0] for ref in node_link_ids if "::" in ref})
+        needed_nodes = [nid for nid in needed_nodes if nid in nodes_snap]
+        snapshots = await asyncio.gather(
+            *(_fetch_node_snapshot(nid, nodes_snap[nid], fresh=True) for nid in needed_nodes),
+            return_exceptions=True,
+        )
+        snap_by_node = dict(zip(needed_nodes, snapshots))
+        for ref in node_link_ids:
+            if "::" not in ref:
+                continue
+            nid, uid = ref.split("::", 1)
+            node_snap = snap_by_node.get(nid)
+            if not node_snap or isinstance(node_snap, Exception):
+                continue
+            node_link = next((l for l in (node_snap.get("links") or []) if l.get("uuid") == uid), None)
+            if not node_link or not node_link.get("vless_link"):
+                continue
+            lb = node_link.get("limit_bytes", 0)
+            allowed = bool(node_link.get("active", True)) and not node_link.get("expired") and not (lb > 0 and node_link.get("used_bytes", 0) >= lb)
+            links_out.append({
+                "uuid": nid + "::" + uid,
+                "label": node_link.get("label", uid),
+                "active": allowed,
+                "protocol": node_link.get("protocol", DEFAULT_PROTOCOL),
+                "used_bytes": node_link.get("used_bytes", 0),
+                "limit_bytes": node_link.get("limit_bytes", 0),
+                "vless_link": node_link["vless_link"],
+            })
+
+    # ۲.۶ کانفیگ‌های ایستا (foreign_links) — مثلاً کانفیگ‌های پنل مرکزی که روی
+    # یک نود اضافه شده‌اند؛ چون این نود به پنل مرکزی دسترسی برگشتی ندارد،
+    # این کانفیگ‌ها به‌صورت اسنپ‌شات (لینک آماده) ذخیره و همینجا نمایش داده می‌شوند.
+    for fl in sub.get("foreign_links", []):
+        vl = fl.get("vless_link")
+        if not vl:
+            continue
+        links_out.append({
+            "uuid": fl.get("key") or vl,
+            "label": fl.get("label", "کانفیگ"),
+            "active": True,
+            "protocol": fl.get("protocol", DEFAULT_PROTOCOL),
+            "used_bytes": fl.get("used_bytes", 0),
+            "limit_bytes": 0,
+            "vless_link": vl,
+        })
+
     # ۳. تشخیص کلاینت یا مرورگر
     user_agent = request.headers.get("User-Agent", "").lower()
     is_client = any(ua in user_agent for ua in ["v2rayng", "v2rayn", "shadowrocket", "clash", "surfboard", "nekoray"])
@@ -1414,7 +2294,7 @@ async def public_sub_data(uuid_key: str, request: Request):
     # ۴. اگر مرورگر است: دیتای کامل JSON را برگردان
     return {
         "locked": False,
-        "name": sub["name"],
+        "name": f"پنل: {sub['name']}",
         "desc": sub.get("desc", ""),
         "sub_url": f"https://{host}/sub-group/{uuid_key}",
         "active_connections": active_conns,
@@ -1550,7 +2430,7 @@ async def test_ws_redirect():
 
 if __name__ == "__main__":
     uvicorn.run(
-        "main:app",
+        app,
         host="0.0.0.0",
         port=CONFIG["port"],
         log_level="info",

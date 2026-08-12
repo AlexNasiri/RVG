@@ -14,7 +14,7 @@ import secrets
 import socket
 import time
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import Request, HTTPException
 
@@ -86,6 +86,8 @@ def _tune_socket(writer: asyncio.StreamWriter):
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, TROJAN_SOCK_BUF_SIZE)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, TROJAN_SOCK_BUF_SIZE)
+        if hasattr(socket, "TCP_QUICKACK"):
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_QUICKACK, 1)
     except OSError as e:
         logger.warning(f"Trojan-XHTTP _tune_socket failed: {e}")
 
@@ -211,7 +213,7 @@ async def _get_or_create_session(uuid: str, mode: str, session_id: str, ip: str 
         connections[conn_id] = {
             "uuid": uuid,
             "ip": ip,
-            "connected_at": datetime.now().isoformat(),
+            "connected_at": datetime.now(timezone.utc).isoformat(),
             "bytes": 0,
             "transport": f"trojan-xhttp-{mode}",
         }
@@ -222,9 +224,8 @@ async def _get_or_create_session(uuid: str, mode: str, session_id: str, ip: str 
             "last_seen": time.time(),
             "conn_id": conn_id, "tcp_open": False, "closed": False,
             "seq_buf": {}, "next_seq": 0,
-            "gate": None,   # لازی: _TrojanQuotaGate مخصوص stream-up/stream-one
-            "flow": None,   # لازی: _TrojanAdaptiveFlow مخصوص stream-up/stream-one
-            "upload_lock": asyncio.Lock(),
+            "gate": None,   # لازی: _TrojanQuotaGate مخصوص stream-up
+            "flow": None,   # لازی: _TrojanAdaptiveFlow مخصوص stream-up
         }
         trojan_xhttp_sessions[session_id] = sess
         logger.info(f"new Trojan-XHTTP[{mode}] session [{session_id[:8]}] uuid={uuid[:8]} ip={ip}")

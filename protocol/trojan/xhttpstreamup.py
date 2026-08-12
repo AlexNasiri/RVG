@@ -1,17 +1,17 @@
 # xhttpstreamup.py (trojan)
 # ══════════════════════════════════════════════════════════════════════════════
-# XHTTP — آپلینک stream-up اختصاصی Trojan (POST(های) پیوسته روی یک session).
+# XHTTP — آپلینک stream-up اختصاصی Trojan (یک POST پیوسته روی یک session).
 # مستقل از موتور VLESS، مسیر با پیشوند /txhttp-siz10.
+# دقیقاً هم‌راستا با نسخه‌ی مرجع: بدون لاک روی هر chunk (دلیل حذف در
+# protocol/vless/xhttpstreamup.py توضیح داده شده — همون منطق اینجا هم صادقه).
 # ══════════════════════════════════════════════════════════════════════════════
 
 import time
-import traceback
 from datetime import datetime
 
 from fastapi import APIRouter, Request, HTTPException
-from starlette.requests import ClientDisconnect
 
-from main import stats, connections, error_logs, logger
+from main import stats, connections, error_logs
 from protocol.trojan.xhttp_core import (
     _TrojanAdaptiveFlow,
     _TrojanQuotaGate,
@@ -42,68 +42,40 @@ async def trojan_stream_up_upload(uuid: str, session_id: str, request: Request):
         flow = _TrojanAdaptiveFlow()
         sess["flow"] = flow
 
-    upload_lock = sess["upload_lock"]
-    conn = connections.get(sess["conn_id"])
-    if conn is None:
-        raise HTTPException(status_code=404, detail="session closed")
+    conn = connections[sess["conn_id"]]
+    writer = sess["writer"]
 
-    async with upload_lock:
-        writer = sess["writer"]
+    try:
+        async for chunk in request.stream():
+            if not chunk:
+                continue
+            sess["last_seen"] = time.time()
 
-        try:
-            async for chunk in request.stream():
-                if not chunk:
-                    continue
-                sess["last_seen"] = time.time()
+            if not await gate.add(len(chunk)):
+                raise HTTPException(status_code=403, detail="quota/disabled/unknown")
 
-                if not await gate.add(len(chunk)):
-                    logger.warning(f"Trojan-XHTTP[stream-up] [{session_id[:8]}] quota exceeded during upload")
-                    raise HTTPException(status_code=403, detail="quota/disabled/unknown")
+            stats["total_requests"] += 1
+            conn["bytes"] += len(chunk)
 
-                stats["total_requests"] += 1
-                conn["bytes"] += len(chunk)
+            if writer is None:
+                await _open_tcp_for_session(session_id, uuid, sess, chunk)
+                writer = sess["writer"]
+                continue
 
-                if writer is None:
-                    await _open_tcp_for_session(session_id, uuid, sess, chunk)
-                    writer = sess["writer"]
-                    continue
-
-                if writer.is_closing():
-                    raise ConnectionError("transport closing (remote already closed)")
-                writer.write(chunk)
-                if flow.should_drain(writer.transport.get_write_buffer_size()):
-                    await flow.drain(writer)
-
-        except ClientDisconnect:
-            await gate.flush()
-            if sess.get("writer") and not sess["writer"].is_closing():
-                try:
-                    await sess["writer"].drain()
-                except Exception:
-                    pass
-            logger.info(f"Trojan-XHTTP[stream-up] [{session_id[:8]}] uplink closed by client, downlink still active")
-            return
-
-        except HTTPException as exc:
-            logger.warning(f"Trojan-XHTTP[stream-up] [{session_id[:8]}] HTTPException: {exc.status_code} {exc.detail}")
-            await gate.flush()
-            await _teardown(session_id, reason=f"http-{exc.status_code}")
-            raise
-
-        except (ConnectionResetError, BrokenPipeError, ConnectionError) as exc:
-            logger.warning(f"Trojan-XHTTP[stream-up] [{session_id[:8]}] connection error: {type(exc).__name__}: {exc}")
-            error_logs.append({"error": f"trojan stream-up conn error: {type(exc).__name__}: {exc}", "time": datetime.now().isoformat()})
-            await gate.flush()
-            await _teardown(session_id, reason=f"conn-error: {type(exc).__name__}")
-            raise HTTPException(status_code=502, detail="stream error")
-
-        except Exception as exc:
-            tb = traceback.format_exc()
-            logger.error(f"Trojan-XHTTP[stream-up] [{session_id[:8]}] stream CRASHED: {type(exc).__name__}: {exc}\n{tb}")
-            error_logs.append({"error": f"trojan stream-up crash: {type(exc).__name__}: {exc}", "time": datetime.now().isoformat()})
-            await gate.flush()
-            await _teardown(session_id, reason=f"crash: {type(exc).__name__}")
-            raise HTTPException(status_code=502, detail="stream error")
-
+            if writer.is_closing():
+                raise ConnectionError("transport closing")
+            writer.write(chunk)
+            if flow.should_drain(writer.transport.get_write_buffer_size()):
+                await flow.drain(writer)
+    except HTTPException:
         await gate.flush()
-        return {"ok": True}
+        await _teardown(session_id, reason="quota/http")
+        raise
+    except Exception as exc:
+        error_logs.append({"error": str(exc), "time": datetime.now().isoformat()})
+        await gate.flush()
+        await _teardown(session_id, reason=f"stream-error: {type(exc).__name__}")
+        raise HTTPException(status_code=502, detail="stream error")
+
+    await gate.flush()
+    return {"ok": True}

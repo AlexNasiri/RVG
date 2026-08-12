@@ -48,6 +48,8 @@ def _tune_socket(writer: asyncio.StreamWriter):
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, SOCK_BUF)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, SOCK_BUF)
+        if hasattr(socket, "TCP_QUICKACK"):
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_QUICKACK, 1)
     except OSError as e:
         logger.warning(f"SS _tune_socket failed: {e}")
 
@@ -225,20 +227,4 @@ def generate_ss_link(host: str, port: int, cipher: str, password: str, remark: s
 
     userinfo = base64.urlsafe_b64encode(f"{cipher}:{password}".encode()).decode().rstrip("=")
     plugin = quote(f"v2ray-plugin;tls;mux=0;path=/ss-ws;host={host}")
-    return f"ss://{userinfo}@{host}:{port}/?plugin={plugin}#{quote(remark)}"
-
-
-def generate_ss_xhttp_link(uuid: str, host: str, port: int, cipher: str, password: str, remark: str, mode: str) -> str:
-    """
-    ss://base64(method:password)@host:port?plugin=...#remark — نسخه‌ی XHTTP.
-    برخلاف حالت WS (که کلاینت با امتحان کردن کلید هر لینک session رو تشخیص
-    می‌ده)، مسیر XHTTP نیاز به uuid داره چون سرور با check_link(uuid) لینک رو
-    مستقیم از روی uuid پیدا می‌کنه، نه از روی رمزگشایی هندشیک.
-    """
-    import base64
-    from urllib.parse import quote
-
-    userinfo = base64.urlsafe_b64encode(f"{cipher}:{password}".encode()).decode().rstrip("=")
-    path = f"/xhttp-ss/{mode}/{uuid}"
-    plugin = quote(f"xhttp-plugin;tls;mode={mode};host={host};path={path}")
     return f"ss://{userinfo}@{host}:{port}/?plugin={plugin}#{quote(remark)}"

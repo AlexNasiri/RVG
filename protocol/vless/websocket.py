@@ -6,7 +6,7 @@
 
 import asyncio
 import secrets
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -48,7 +48,7 @@ async def websocket_tunnel(ws: WebSocket, uuid: str):
         "uuid": uuid,
         "ip": ip,
         "transport": "vless-ws",
-        "connected_at": datetime.now().isoformat(),
+        "connected_at": datetime.now(timezone.utc).isoformat(),
         "bytes": 0,
     }
     logger.info(f"✅ WS [{conn_id}] uuid={uuid[:8]}… ip={ip} total={len(connections)}")
