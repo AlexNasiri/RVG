@@ -1,11 +1,11 @@
-# pages.py  -  RVG Gateway v9.2
+# pages.py  -  VI Gateway v9.2
 # شامل: LOGIN_HTML, DASHBOARD_HTML, get_public_page_html()
 
 LOGIN_HTML = r"""<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ورود · RVG Gateway</title>
+<title>ورود · VI Gateway</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
@@ -221,8 +221,8 @@ input:focus~.ic-lock{color:var(--accent2);animation:wiggle .4s ease}
 <div class="wrap" id="wrap">
   <div class="card" id="card">
     <div class="brand">
-      <div class="brand-img"><img src="https://yt3.googleusercontent.com/vA6bYj1V386YmibpWRNFJtsRRqwfY_U9wnb7gmW90eRVXyNB7gAfjj1XPs5UX0cdKdQprrI=s160-c-k-c0x00ffffff-no-rj" alt="codebox"></div>
-      <div><div class="brand-name">codebox</div><div class="brand-sub">RVG Gateway <span class="mono">· v9.2</span></div></div>
+      <div class="brand-img"><img src="https://yt3.googleusercontent.com/vA6bYj1V386YmibpWRNFJtsRRqwfY_U9wnb7gmW90eRVXyNB7gAfjj1XPs5UX0cdKdQprrI=s160-c-k-c0x00ffffff-no-rj" alt="Alex"></div>
+      <div><div class="brand-name">Alex</div><div class="brand-sub">VI Gateway <span class="mono">· v9.2</span></div></div>
     </div>
     <h1>ورود به پنل</h1>
     <p class="sub">رمز عبور را برای دسترسی به داشبورد مدیریت وارد کنید</p>
@@ -247,20 +247,20 @@ input:focus~.ic-lock{color:var(--accent2);animation:wiggle .4s ease}
       <button class="btn" type="submit" id="btn"><i class="ti ti-login-2"></i> ورود به داشبورد</button>
     </form>
 
-    <div class="footer">کانال رسمی<a href="https://t.me/CodeBoxo" target="_blank" rel="noopener"><i class="ti ti-brand-telegram"></i>@CodeBoxo</a></div>
+    <div class="footer">کانال رسمی<a href="https://t.me/AlexNasiri" target="_blank" rel="noopener"><i class="ti ti-brand-telegram"></i>@AlexNasiri</a></div>
   </div>
 </div>
 
 <script>
 /* ══════ تم روشن/تاریک ══════ */
-let isDark = localStorage.getItem('rvg-login-theme') !== 'light';
+let isDark = localStorage.getItem('VI-login-theme') !== 'light';
 function applyTheme(dark){
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   document.getElementById('theme-icon').className = 'ti ' + (dark ? 'ti-sun' : 'ti-moon');
 }
 function toggleTheme(){
   isDark = !isDark;
-  localStorage.setItem('rvg-login-theme', isDark ? 'dark' : 'light');
+  localStorage.setItem('VI-login-theme', isDark ? 'dark' : 'light');
   const btn = document.getElementById('theme-btn');
   btn.classList.add('spin');
   setTimeout(()=>btn.classList.remove('spin'), 420);
@@ -340,7 +340,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RVG Gateway · codebox</title>
+<title>VI Gateway · Alex</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
@@ -1696,30 +1696,6 @@ a{color:inherit;text-decoration:none}
     </div>
   </div>
 </div>
-<!-- ══════ اطلاعیه رسمی مالکیت معنوی ══════ -->
-<div class="modal-bg" id="modal-copyright-notice" style="z-index:9999">
-  <div class="modal-v2" style="max-width:460px">
-    <div class="modal-v2-head" style="background:linear-gradient(155deg,rgba(239,68,68,.16) 0%,transparent 65%)">
-      <button class="modal-v2-close" onclick="closeModal('modal-copyright-notice')"><i class="ti ti-x"></i></button>
-      <div class="modal-v2-icon" style="background:linear-gradient(135deg,var(--red),#B91C1C);box-shadow:0 8px 18px rgba(239,68,68,.4)"><i class="ti ti-copyright"></i></div>
-      <div class="modal-v2-title">اطلاعیه رسمی مالکیت معنوی</div>
-      <div class="modal-v2-sub">توجه به موضوع نقض کپی‌رایت پروژه</div>
-    </div>
-    <div class="modal-v2-body">
-      <div class="cl amber" style="margin-top:0">
-        <i class="ti ti-alert-triangle"></i>
-        <span>به تازگی فردی اقدام به کپی‌برداری غیرمجاز از سورس‌کد این پروژه نموده و آن را تحت عنوان «X4G» بازنشر کرده است این اقدام، نقض آشکار حقوق مالکیت معنوی (کپی‌رایت) پروژه‌ی RVG Gateway محسوب می‌شود</span>
-      </div>
-      <div class="cl" style="margin-top:10px">
-        <i class="ti ti-info-circle"></i>
-        <span>از کاربران و همکاران محترم درخواست می‌شود از استفاده، انتشار یا معرفی نسخه‌ی کپی‌شده با نام «X4G» خودداری نموده و صرفاً از منبع رسمی و اصلی این پروژه — RVG Gateway · codebox — بهره‌مند شوند. هرگونه استفاده از نسخه‌ی مذکور، حقوق قانونی صاحب اثر را نقض می‌کند و پیگرد آن محفوظ است.</span>
-      </div>
-      <div class="modal-v2-footer">
-        <button class="btn btn-p" style="flex:1;justify-content:center" onclick="closeModal('modal-copyright-notice')"><i class="ti ti-check"></i> متوجه شدم</button>
-      </div>
-    </div>
-  </div>
-</div>
 
 <div class="modal-bg" id="modal-links">
   <div class="modal-v2" style="max-width:520px;display:flex;flex-direction:column;max-height:88vh;overflow:hidden">
@@ -2176,7 +2152,7 @@ a{color:inherit;text-decoration:none}
     <div class="modal-v2-body">
       <div class="modal-v2-field">
         <label><i class="ti ti-key"></i> کلید اتصال</label>
-        <textarea class="modal-v2-input" id="nc-key" rows="3" style="resize:vertical;direction:ltr;font-family:ui-monospace,Menlo,monospace;font-size:11px" placeholder="rvg-..." oninput="previewNodeKey()"></textarea>
+        <textarea class="modal-v2-input" id="nc-key" rows="3" style="resize:vertical;direction:ltr;font-family:ui-monospace,Menlo,monospace;font-size:11px" placeholder="VI-..." oninput="previewNodeKey()"></textarea>
         <div class="nc-host-chip"><i class="ti ti-server-2"></i><span id="nc-host-preview">دامنه‌ی پنل مقابل اینجا نمایش داده می‌شود</span></div>
       </div>
       <div class="modal-v2-field">
@@ -2226,7 +2202,7 @@ a{color:inherit;text-decoration:none}
 <div class="mob-top">
   <div class="ml">
     <div class="mob-logo"><img src="https://yt3.googleusercontent.com/vA6bYj1V386YmibpWRNFJtsRRqwfY_U9wnb7gmW90eRVXyNB7gAfjj1XPs5UX0cdKdQprrI=s160-c-k-c0x00ffffff-no-rj" alt="cb"></div>
-    <span class="mob-title">RVG Gateway</span>
+    <span class="mob-title">VI Gateway</span>
   </div>
   <div class="mob-right">
     <button class="theme-mob" id="theme-mob-btn" onclick="toggleTheme()"><i class="ti ti-sun" id="theme-mob-icon"></i></button>
@@ -2238,7 +2214,7 @@ a{color:inherit;text-decoration:none}
   <button class="sb-close" id="close-sb"><i class="ti ti-x"></i></button>
   <div class="logo">
     <div class="logo-img"><img src="https://yt3.googleusercontent.com/vA6bYj1V386YmibpWRNFJtsRRqwfY_U9wnb7gmW90eRVXyNB7gAfjj1XPs5UX0cdKdQprrI=s160-c-k-c0x00ffffff-no-rj" alt="cb"></div>
-    <div><div class="logo-name">codebox</div><div class="logo-sub">RVG Gateway · v9.2</div></div>
+    <div><div class="logo-name">Alex</div><div class="logo-sub">VI Gateway · v9.2</div></div>
   </div>
   <div class="nav-wrap">
     <div class="nav-sec">پنل</div>
@@ -2259,7 +2235,7 @@ a{color:inherit;text-decoration:none}
   </div>
   <div class="sb-foot">
     <button class="theme-btn" onclick="toggleTheme()"><i class="ti ti-moon" id="theme-icon"></i> <span id="theme-label">تم روشن</span></button>
-    <a class="tg-btn" href="https://t.me/CodeBoxo" target="_blank" rel="noopener"><i class="ti ti-brand-telegram"></i> @CodeBoxo</a>
+    <a class="tg-btn" href="https://t.me/AlexNasiri" target="_blank" rel="noopener"><i class="ti ti-brand-telegram"></i> @AlexNasiri</a>
     <button class="logout-btn" id="logout-btn"><i class="ti ti-logout"></i> خروج</button>
   </div>
 </aside>
@@ -2317,8 +2293,8 @@ a{color:inherit;text-decoration:none}
     </div>
   </div>
   <div class="dash-footer">
-    <span class="df-text">codebox RVG Gateway v9.2 · Railway · 2025</span>
-    <a class="df-link" href="https://t.me/CodeBoxo" target="_blank"><i class="ti ti-brand-telegram"></i> t.me/CodeBoxo</a>
+    <span class="df-text">Alex VI Gateway v9.2 · Railway · 2025</span>
+    <a class="df-link" href="https://t.me/AlexNasiri" target="_blank"><i class="ti ti-brand-telegram"></i> t.me/AlexNasiri</a>
   </div>
 </section>
 <section class="pg" id="pg-links">
@@ -2511,7 +2487,7 @@ a{color:inherit;text-decoration:none}
         <div class="node-hero-icon"><i class="ti ti-topology-star-3"></i></div>
         <div>
           <div class="tb-title">نود</div>
-          <div class="tb-sub">چند پنل RVG را به هم متصل کنید تا کانفیگ‌ها و مصرف‌شان یکی شود</div>
+          <div class="tb-sub">چند پنل VI را به هم متصل کنید تا کانفیگ‌ها و مصرف‌شان یکی شود</div>
         </div>
       </div>
       <div class="tb-right">
@@ -2642,7 +2618,7 @@ a{color:inherit;text-decoration:none}
     <div class="sup-head">
       <div class="sup-head-icon"><i class="ti ti-headset"></i></div>
       <div class="sup-head-text">
-        <div class="sup-head-title">پشتیبانی RVG</div>
+        <div class="sup-head-title">پشتیبانی VI</div>
         <div class="sup-head-sub"><span class="sdot"></span> معمولاً در کمتر از چند ساعت پاسخ داده می‌شود</div>
       </div>
     </div>
@@ -2746,13 +2722,13 @@ a{color:inherit;text-decoration:none}
 </section>
 </main>
 <script>
-let isDark=localStorage.getItem('rvg-theme')!=='light';
+let isDark=localStorage.getItem('VI-theme')!=='light';
 let updateAvailable = false;
 let updateVersion = '';
 let updateDescription = '';
 
 function dismissUpdate() {
-  sessionStorage.setItem('rvg-update-dismissed', 'true');
+  sessionStorage.setItem('VI-update-dismissed', 'true');
   closeModal('modal-update');
 }
 
@@ -2768,7 +2744,7 @@ function applyTheme(dark){
   const mobI=document.getElementById('theme-mob-icon');if(mobI)mobI.className='ti '+icon;
 }
 
-function toggleTheme(){isDark=!isDark;localStorage.setItem('rvg-theme',isDark?'dark':'light');applyTheme(isDark)}
+function toggleTheme(){isDark=!isDark;localStorage.setItem('VI-theme',isDark?'dark':'light');applyTheme(isDark)}
 applyTheme(isDark);
 function toast(msg,type=''){
   const t=document.getElementById('toast');
@@ -3890,7 +3866,7 @@ const LABEL_MAP={ad:'تبلیغ',news:'خبر',warning:'هشدار',urgent:'فو
 async function loadAnnouncements(){
   try{
     const r=await authF('/api/announcements'),d=await r.json();
-    const seen=JSON.parse(localStorage.getItem('rvg-seen-ann')||'[]');
+    const seen=JSON.parse(localStorage.getItem('VI-seen-ann')||'[]');
     const list=(d.announcements||[]).filter(a=>!seen.includes(a.id));
     document.getElementById('ann-banner-wrap').innerHTML=list.map(a=>`
       <div class="ann-card ${a.type}" id="ann-${a.id}">
@@ -3912,8 +3888,8 @@ async function loadAnnouncements(){
   }catch(e){}
 }
 function dismissAnn(id){
-  const seen=JSON.parse(localStorage.getItem('rvg-seen-ann')||'[]');
-  seen.push(id);localStorage.setItem('rvg-seen-ann',JSON.stringify(seen));
+  const seen=JSON.parse(localStorage.getItem('VI-seen-ann')||'[]');
+  seen.push(id);localStorage.setItem('VI-seen-ann',JSON.stringify(seen));
   document.getElementById('ann-'+id)?.remove();
 }
 let lastSupportMsgId = null;
@@ -3989,14 +3965,14 @@ async function loadSupportMsgs() {
     const nb = document.getElementById('support-nb');
     if (nb) {
       const lastAdmin = [...msgs].reverse().find((m) => m.sender === 'admin');
-      const seenId = localStorage.getItem('rvg-last-seen-support-msg');
+      const seenId = localStorage.getItem('VI-last-seen-support-msg');
       const onSupportPage = document
         .getElementById('pg-support')
         .classList.contains('on');
       const hasNew = lastAdmin && lastAdmin.id !== seenId && !onSupportPage;
       nb.style.display = hasNew ? 'inline-flex' : 'none';
       if (lastAdmin && onSupportPage)
-        localStorage.setItem('rvg-last-seen-support-msg', lastAdmin.id);
+        localStorage.setItem('VI-last-seen-support-msg', lastAdmin.id);
     }
   } catch (e) {
     // silent fail
@@ -4030,7 +4006,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   
   try {
-    const updateDismissed = sessionStorage.getItem('rvg-update-dismissed') === 'true';
+    const updateDismissed = sessionStorage.getItem('VI-update-dismissed') === 'true';
     if (updateAvailable && !updateDismissed) {
       document.getElementById('update-modal-version').textContent = updateVersion;
       document.getElementById('update-modal-desc').textContent = updateDescription;
@@ -4705,7 +4681,7 @@ async function downloadBackup(){
     const blob = await r.blob();
     const cd = r.headers.get('Content-Disposition') || '';
     const m = cd.match(/filename="?([^"]+)"?/);
-    const filename = m ? m[1] : 'rvg-backup.json';
+    const filename = m ? m[1] : 'VI-backup.json';
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = filename;
@@ -4871,7 +4847,7 @@ function openNodeConnectModal(){
 function previewNodeKey(){
   const raw=document.getElementById('nc-key').value.trim();
   const el=document.getElementById('nc-host-preview');
-  if(!raw.startsWith('rvg-')||!raw.slice(4).includes('.')){ el.textContent='—'; return; }
+  if(!raw.startsWith('VI-')||!raw.slice(4).includes('.')){ el.textContent='—'; return; }
   try{
     const hostPart=raw.slice(4).split('.')[0];
     let b64=hostPart.replace(/-/g,'+').replace(/_/g,'/');
@@ -5021,7 +4997,7 @@ def get_public_page_html(uuid_key: str) -> str:
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>RVG Sub · codebox</title>
+<title>VI Sub · Alex</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
@@ -5223,17 +5199,17 @@ html,body{{min-height:100%;background:var(--bg);font-family:var(--serif);color:v
   <div class="top">
     <div class="brand">
       <div class="brand-img"><img src="https://yt3.googleusercontent.com/vA6bYj1V386YmibpWRNFJtsRRqwfY_U9wnb7gmW90eRVXyNB7gAfjj1XPs5UX0cdKdQprrI=s160-c-k-c0x00ffffff-no-rj" alt="cb"></div>
-      <div><div class="brand-name">codebox</div><div class="brand-sub">RVG Gateway · v9.2</div></div>
+      <div><div class="brand-name">Alex</div><div class="brand-sub">VI Gateway · v9.2</div></div>
     </div>
     <div class="top-actions">
       <button class="icon-btn" id="theme-toggle" onclick="toggleTheme()" title="تغییر تم"><i class="ti ti-sun" id="theme-icon"></i></button>
-      <a class="icon-btn" href="https://t.me/CodeBoxo" target="_blank" title="کانال تلگرام"><i class="ti ti-brand-telegram"></i></a>
+      <a class="icon-btn" href="https://t.me/AlexNasiri" target="_blank" title="کانال تلگرام"><i class="ti ti-brand-telegram"></i></a>
     </div>
   </div>
   <div id="root">
     <div class="empty-state"><i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i>در حال بارگذاری...</div>
   </div>
-  <div class="footer">کانال رسمی: <a href="https://t.me/CodeBoxo" target="_blank">@CodeBoxo</a> · RVG Gateway v9.2</div>
+  <div class="footer">کانال رسمی: <a href="https://t.me/AlexNasiri" target="_blank">@AlexNasiri</a> · VI Gateway v9.2</div>
 </div>
 <script>
 const UUID_KEY='{uuid_key}';
@@ -5246,12 +5222,12 @@ let SUB_DATA = {{
   links: []
 }};
 
-let isDark=localStorage.getItem('rvg-pub-theme')!=='light';
+let isDark=localStorage.getItem('VI-pub-theme')!=='light';
 function applyTheme(dark){{
   document.documentElement.setAttribute('data-theme',dark?'dark':'light');
   document.getElementById('theme-icon').className='ti '+(dark?'ti-sun':'ti-moon');
 }}
-function toggleTheme(){{isDark=!isDark;localStorage.setItem('rvg-pub-theme',isDark?'dark':'light');applyTheme(isDark)}}
+function toggleTheme(){{isDark=!isDark;localStorage.setItem('VI-pub-theme',isDark?'dark':'light');applyTheme(isDark)}}
 applyTheme(isDark);
 
 function toast(msg,type=''){{
@@ -5380,9 +5356,9 @@ function renderContent(d){{
   SUB_DATA.total_limit = totalLimit;
   SUB_DATA.expiry_date = expiryDate;
 
-  window._rvgSubUrl  = subUrl;
-  window._rvgSubName = d.name;
-  window._rvgLinks   = d.links.map(l => ({{
+  window._VISubUrl  = subUrl;
+  window._VISubName = d.name;
+  window._VILinks   = d.links.map(l => ({{
     vless : l.vless_link,
     sub   : l.sub_url + (savedPw ? '?pw=' + encodeURIComponent(savedPw) : ''),
     label : l.label,
@@ -5419,11 +5395,11 @@ function renderContent(d){{
       <div class="sub-sub-box">
         <span class="sub-sub-url">${{esc(subUrl)}}</span>
         <button class="btn btn-pur" style="padding:7px 12px;font-size:10.5px"
-          onclick="navigator.clipboard.writeText(window._rvgSubUrl).then(()=>toast('لینک ساب کپی شد ✓','ok'))">
+          onclick="navigator.clipboard.writeText(window._VISubUrl).then(()=>toast('لینک ساب کپی شد ✓','ok'))">
           <i class="ti ti-copy"></i> کپی لینک ساب
         </button>
         <button class="btn btn-g" style="padding:7px 12px;font-size:10.5px"
-          onclick="showQR(window._rvgSubName + ' — کل گروه', window._rvgSubUrl)">
+          onclick="showQR(window._VISubName + ' — کل گروه', window._VISubUrl)">
           <i class="ti ti-qrcode"></i> QR کل
         </button>
       </div>
@@ -5502,11 +5478,11 @@ function renderContent(d){{
               </div>
               <div class="cfg-actions">
                 <button class="btn btn-p"
-                  onclick="navigator.clipboard.writeText(window._rvgLinks[${{i}}].vless).then(()=>toast('لینک کپی شد ✓','ok'))">
+                  onclick="navigator.clipboard.writeText(window._VILinks[${{i}}].vless).then(()=>toast('لینک کپی شد ✓','ok'))">
                   <i class="ti ti-copy"></i> کپی لینک
                 </button>
                 <button class="btn btn-g"
-                  onclick="showQR(window._rvgLinks[${{i}}].label, window._rvgLinks[${{i}}].vless)">
+                  onclick="showQR(window._VILinks[${{i}}].label, window._VILinks[${{i}}].vless)">
                   <i class="ti ti-qrcode"></i> QR
                 </button>
               </div>
@@ -5524,16 +5500,16 @@ function renderContent(d){{
 
 function updateSubscriptionHeaders(used, limit, expiry) {{
   try {{
-    localStorage.setItem('rvg_sub_used', String(used));
-    localStorage.setItem('rvg_sub_limit', String(limit));
+    localStorage.setItem('VI_sub_used', String(used));
+    localStorage.setItem('VI_sub_limit', String(limit));
     if (expiry) {{
-      localStorage.setItem('rvg_sub_expiry', expiry);
+      localStorage.setItem('VI_sub_expiry', expiry);
     }}
   }} catch(e) {{}}
 }}
 
 function copyAllConfigs(){{
-  const links=window._rvgLinks||[];
+  const links=window._VILinks||[];
   if(!links.length){{toast('کانفیگی برای کپی نیست','');return}}
   const text=links.map(l=>l.vless).join('\\n');
   navigator.clipboard.writeText(text).then(()=>toast('همه‌ی '+toFa(links.length)+' کانفیگ کپی شد ✓','ok'));
@@ -5548,9 +5524,9 @@ async function autoRefresh(){{
 
 function getSubscriptionInfo() {{
   return {{
-    used: parseInt(localStorage.getItem('rvg_sub_used') || '0'),
-    limit: parseInt(localStorage.getItem('rvg_sub_limit') || '0'),
-    expiry: localStorage.getItem('rvg_sub_expiry') || null
+    used: parseInt(localStorage.getItem('VI_sub_used') || '0'),
+    limit: parseInt(localStorage.getItem('VI_sub_limit') || '0'),
+    expiry: localStorage.getItem('VI_sub_expiry') || null
   }};
 }}
 
