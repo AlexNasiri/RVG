@@ -53,11 +53,11 @@ import httpx
 import logging
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("RVG-Gateway")
+logger = logging.getLogger("VI-Gateway")
 
 IRAN_TZ = ZoneInfo("Asia/Tehran")
 
-app = FastAPI(title="RVG Gateway - codebox", docs_url=None, redoc_url=None)
+app = FastAPI(title="VI Gateway - Alex", docs_url=None, redoc_url=None)
 
 # وقتی مستقیم با `python main.py` اجرا میشه، این ماژول با نام "__main__" ثبت
 # میشه نه "main". چون protocol/vless/vless.py و protocol/trojan/trojan.py با
@@ -207,7 +207,7 @@ NODES_LOCK = asyncio.Lock()
 _NODE_CACHE: dict = {}          # node_id -> {"at": float, "data": dict}
 NODE_CACHE_TTL = 8.0
 NODE_KEY_PREFIX = "VI-"
-NODE_KEY_HEADER = "X-RVG-Node-Key"
+NODE_KEY_HEADER = "X-VI-Node-Key"
 NODE_SHARE_PARTS = ("usage", "links", "subs", "requests", "logs")
 
 PROTOCOLS = (
@@ -280,7 +280,7 @@ async def startup():
     await load_state()
     await _restart_mtproto_instances()
     log_activity("system", "سرور راه‌اندازی شد", "ok")
-    logger.info(f"RVG Gateway v9.2 started on port {CONFIG['port']}")
+    logger.info(f"VI Gateway v9.2 started on port {CONFIG['port']}")
 
 async def _restart_mtproto_instances():
     async with LINKS_LOCK:
@@ -664,7 +664,7 @@ async def _node_request(node: dict, method: str, path: str, *,
 
 
 async def require_node_key(request: Request) -> str:
-    """احراز هویت پنل مقابل با هدر X-RVG-Node-Key (بدون کوکی سشن)."""
+    """احراز هویت پنل مقابل با هدر X-VI-Node-Key (بدون کوکی سشن)."""
     raw = (request.headers.get(NODE_KEY_HEADER) or "").strip()
     if not raw:
         raise HTTPException(status_code=401, detail="node key missing")
@@ -718,7 +718,7 @@ async def ensure_default_link():
 # ── Basic endpoints ───────────────────────────────────────────────────────────
 @app.get("/")
 async def root():
-    return {"service": "RVG Gateway", "version": "9.2", "status": "active", "channel": "https://t.me/CodeBoxo"}
+    return {"service": "VI Gateway", "version": "9.2", "status": "active", "channel": "https://t.me/AlexNasiri"}
 
 @app.get("/health")
 async def health():
@@ -1041,7 +1041,7 @@ async def backup_export(_=Depends(require_auth)):
     async with NODES_LOCK:
         nodes_snap = dict(NODES)
     data = {
-        "kind": "rvg-backup",
+        "kind": "VI-backup",
         "version": "9.2",
         "exported_at": datetime.now().isoformat(),
         "host": get_host(),
@@ -1052,7 +1052,7 @@ async def backup_export(_=Depends(require_auth)):
         "password_hash": AUTH["password_hash"],
     }
     content = json.dumps(data, ensure_ascii=False, indent=2)
-    filename = f"rvg-backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
+    filename = f"VI-backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
     log_activity("system", "فایل بکاپ دانلود شد", "info")
     return Response(
         content=content,
@@ -1556,7 +1556,7 @@ async def delete_link(uid: str, _=Depends(require_auth)):
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Node linking — inbound (این پنل صادرکننده‌ی کلید است)
-# احراز هویت این بخش با هدر X-RVG-Node-Key انجام می‌شود، نه کوکی سشن.
+# احراز هویت این بخش با هدر X-VI-Node-Key انجام می‌شود، نه کوکی سشن.
 # ══════════════════════════════════════════════════════════════════════════════
 def _parse_parts(raw: str | None) -> set[str]:
     if not raw:
