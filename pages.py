@@ -221,7 +221,6 @@ input:focus~.ic-lock{color:var(--accent2);animation:wiggle .4s ease}
 <div class="wrap" id="wrap">
   <div class="card" id="card">
     <div class="brand">
-      <div class="brand-img"><img src="https://yt3.googleusercontent.com/vA6bYj1V386YmibpWRNFJtsRRqwfY_U9wnb7gmW90eRVXyNB7gAfjj1XPs5UX0cdKdQprrI=s160-c-k-c0x00ffffff-no-rj" alt="Alex"></div>
       <div><div class="brand-name">Alex</div><div class="brand-sub">VI Gateway <span class="mono">· v9.2</span></div></div>
     </div>
     <h1>ورود به پنل</h1>
@@ -2201,7 +2200,6 @@ a{color:inherit;text-decoration:none}
 </div>
 <div class="mob-top">
   <div class="ml">
-    <div class="mob-logo"><img src="https://yt3.googleusercontent.com/vA6bYj1V386YmibpWRNFJtsRRqwfY_U9wnb7gmW90eRVXyNB7gAfjj1XPs5UX0cdKdQprrI=s160-c-k-c0x00ffffff-no-rj" alt="cb"></div>
     <span class="mob-title">VI Gateway</span>
   </div>
   <div class="mob-right">
@@ -2213,7 +2211,6 @@ a{color:inherit;text-decoration:none}
 <aside class="sidebar" id="sb">
   <button class="sb-close" id="close-sb"><i class="ti ti-x"></i></button>
   <div class="logo">
-    <div class="logo-img"><img src="https://yt3.googleusercontent.com/vA6bYj1V386YmibpWRNFJtsRRqwfY_U9wnb7gmW90eRVXyNB7gAfjj1XPs5UX0cdKdQprrI=s160-c-k-c0x00ffffff-no-rj" alt="cb"></div>
     <div><div class="logo-name">Alex</div><div class="logo-sub">VI Gateway · v9.2</div></div>
   </div>
   <div class="nav-wrap">
@@ -5198,7 +5195,6 @@ html,body{{min-height:100%;background:var(--bg);font-family:var(--serif);color:v
 <div class="wrap">
   <div class="top">
     <div class="brand">
-      <div class="brand-img"><img src="https://yt3.googleusercontent.com/vA6bYj1V386YmibpWRNFJtsRRqwfY_U9wnb7gmW90eRVXyNB7gAfjj1XPs5UX0cdKdQprrI=s160-c-k-c0x00ffffff-no-rj" alt="cb"></div>
       <div><div class="brand-name">Alex</div><div class="brand-sub">VI Gateway · v9.2</div></div>
     </div>
     <div class="top-actions">
